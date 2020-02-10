@@ -635,7 +635,7 @@ class Agent(object):
         assert new not in self.actions,'Action %s already defined' % (new)
         self.actions.add(new)
         if condition:
-            self.legal[new] = condition
+            self.legal[new] = condition.desymbolize(self.world.symbols)
         if codePtr:
             if codePtr is True:
                 for frame in inspect.getouterframes(inspect.currentframe()):

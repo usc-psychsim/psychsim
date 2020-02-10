@@ -1737,6 +1737,8 @@ class World(object):
                 if not label is None:
                     print('-------------------',file=buf)
                 self.printState(subdistribution,buf,prefix,beliefs)
+        elif isinstance(distribution,KeyedVector):
+            self.printVector(distribution,buf,prefix,beliefs)
         else:
             for vector in distribution.domain():
                 print('%s%d%%' % (prefix,distribution[vector]*100.),file=buf)
