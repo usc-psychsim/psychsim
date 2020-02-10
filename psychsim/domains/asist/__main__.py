@@ -17,7 +17,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=level)
 
     # Create the overall environment
-    world = World(single=True)
+    world = World()
 
     # Create one victim
     victim = world.addAgent('Victim 1')
@@ -36,6 +36,7 @@ if __name__ == '__main__':
 
     # Create the player
     player = world.addAgent('Player 1')
+    truePlayerModel = next(iter(player.models.keys())) # Get the canonical name of the "true" player model
 
     world.defineState(player.name,'location',int,description='Room number where player is')
     player.setState('location',0)
@@ -58,7 +59,7 @@ if __name__ == '__main__':
     world.setDynamics(stateKey(victim.name,'status'),save,tree)
 
     # Pop quiz: 
-    # Q: What can the agent do now?
+    # Q: What can the player do now?
     # A: Move to rooms 1 or 3
     legal = player.getActions()
     assert len(legal) == 2
@@ -73,16 +74,33 @@ if __name__ == '__main__':
     player.setReward(goal,1)
 
     # Player lookahead
-    player.setAttribute('horizon',5)
+    player.setAttribute('horizon',3)
+
+    # ASIST Agent
+    agent = world.addAgent('ATOMIC')
+    agentModel = next(iter(agent.models.keys())) # Get the canonical name of the "true" agent model
 
     world.setOrder([{player.name}])
 
-    world.printState()
-    print(player.getActions())
-    # The player moves to room 1
-    result = world.step(moves[1])
-    world.printState()
+    # Player is not sure where victim is
+    player.setBelief(stateKey(victim.name,'location'),Distribution({1: 0.1, 3: 0.9}),truePlayerModel)
+    
+    # Uncertain models of players
+    player.addModel('myopic',horizon=1,parent=truePlayerModel,rationality=.7,selection='distribution')
+    player.addModel('strategic',parent=truePlayerModel,rationality=.7,selection='distribution')
+    world.setMentalModel(agent.name,player.name,Distribution({'myopic': 0.5,'strategic': 0.5}))
 
+    world.printState()
+    # Pop Quiz: What do the different player models predict now?
+    for model in ['strategic','myopic']:
+        result = player.decide(model=model)
+        print('%s model chooses:\n%s' % (model,result['action']))
+    # The player moves to room 3
+    world.printState(agent.getBelief(model=agentModel))
+    result = world.step(moves[1])
+    world.printState(agent.getBelief(model=agentModel))
+
+    exit()
     # The player decides autonomously
     print(player.getActions())
     world.step()
