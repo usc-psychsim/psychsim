@@ -167,8 +167,6 @@ class World(object):
             if actor in debug:
                 print('%s: %s' % (actor,policy))
         effect = self.deltaState(joint,state,keySubset,uncertain)
-        if horizon is None: 
-            self.printState(state)
         # Update turn order
         effect.append(self.deltaTurn(state,joint))
         for stage in effect:
@@ -423,7 +421,6 @@ class World(object):
                                 self.printVector(vec)
                         raise
             else:
-#                raise RuntimeError('Parallel dynamics do not work')
                 cumulative = None
                 for tree in dynamics:
                     if cumulative is None:
@@ -439,8 +436,7 @@ class World(object):
                         if isinstance(tree,KeyedMatrix):
                             state *= tree
                         else:
-                            print(tree)
-                            raise TypeError
+                            raise TypeError('Unable to generate selective effect from:\n%s' (tree))
                 else:
                     state *= tree
             if select and isinstance(state,VectorDistributionSet):
