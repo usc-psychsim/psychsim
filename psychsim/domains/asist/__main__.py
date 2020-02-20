@@ -41,7 +41,7 @@ if __name__ == '__main__':
     world.defineState(player.name,'location',int,description='Room number where player is')
     player.setState('location',0)
 
-    # Player can move, but only one room up
+    # Player can move, but only one room over
     location = stateKey(player.name,'location')
     moves = {} # Save the move objects for easier access later
     for room in range(4):
@@ -51,7 +51,7 @@ if __name__ == '__main__':
         tree = makeTree(setToConstantMatrix(location,room))
         world.setDynamics(location,moves[room],tree)
 
-    # Player can save, but only if same room as victim
+    # Player can save, but only if in the same room as victim
     tree = makeTree({'if': equalFeatureRow(location,stateKey(victim.name,'location')),
         True: True, False: False})
     save = player.addAction({'verb': 'save','object': victim.name},tree)
@@ -67,7 +67,7 @@ if __name__ == '__main__':
         assert action['verb'] == 'moveTo'
         assert int(action['object']) in {1,3}
 
-    # Player goals
+    # Player goals (only one)
     goal = makeTree({'if': equalRow(stateKey(victim.name,'status'),'saved'),
         True: setToFeatureMatrix(rewardKey(player.name),stateKey(victim.name,'value')),
         False: setToConstantMatrix(rewardKey(player.name),0)})
@@ -78,34 +78,38 @@ if __name__ == '__main__':
 
     # ASIST Agent
     agent = world.addAgent('ATOMIC')
-    agentModel = next(iter(agent.models.keys())) # Get the canonical name of the "true" agent model
 
     world.setOrder([{player.name}])
 
+    # Players is not aware of agent
+    player.ignore(agent.name)
     # Player is not sure where victim is
-    player.setBelief(stateKey(victim.name,'location'),Distribution({1: 0.1, 3: 0.9}),truePlayerModel)
-    
-    # Uncertain models of players
-    player.addModel('myopic',horizon=1,parent=truePlayerModel,rationality=.7,selection='distribution')
-    player.addModel('strategic',parent=truePlayerModel,rationality=.7,selection='distribution')
-    world.setMentalModel(agent.name,player.name,Distribution({'myopic': 0.5,'strategic': 0.5}))
+#    player.setBelief(stateKey(victim.name,'location'),Distribution({1: 0.1, 3: 0.9}),truePlayerModel)
 
-    world.printState()
+    # Uncertain models of players
+    player.addModel('myopic',horizon=1,parent=truePlayerModel,rationality=.5,selection='distribution')
+    player.addModel('strategic',horizon=3,parent=truePlayerModel,rationality=.5,selection='distribution')
+    # Agent does not model itself
+    agent.resetBelief(ignore={modelKey(agent.name)})
+    # Agent starts with uniform distribution over possible player models
+    world.setMentalModel(agent.name,player.name,Distribution({'myopic': 0.5,'strategic': 0.5}))
+    # Agent observes everything except player's reward received and true models
+    agent.omega = {key for key in world.state.keys() if key not in {modelKey(player.name),modelKey(agent.name),rewardKey(player.name)}}
+    world.printBeliefs(agent.name)
+
     # Pop Quiz: What do the different player models predict now?
     for model in ['strategic','myopic']:
         result = player.decide(model=model)
-        print('%s model chooses:\n%s' % (model,result['action']))
-    # The player moves to room 3
-    world.printState(agent.getBelief(model=agentModel))
-    result = world.step(moves[1])
-    world.printState(agent.getBelief(model=agentModel))
+        print('%s player chooses:\n%s' % (model.capitalize(),result['action']))
 
-    exit()
-    # The player decides autonomously
-    print(player.getActions())
-    world.step()
-    world.printState()
-
-    print(player.getActions())
-    world.step()
-    world.printState()
+    # Pop Quiz: What does the agent think as player moves to room 1, then room 0, then room 3?
+    sequence = [moves[1],moves[0],moves[3]]
+    for action in sequence:
+        print('Agent observes: %s' % (action))
+        result = world.step(action)
+        beliefs = agent.getBelief()
+        assert len(beliefs) == 1 # Because we are dealing with a known-identity agent
+        belief = next(iter(agent.getBelief().values()))
+        print('Agent now models player as:')
+        key = modelKey(player.name)
+        print(world.float2value(key,belief[key]))
