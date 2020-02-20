@@ -1111,6 +1111,8 @@ class Agent(object):
                     # Condition on actual observations
                     for omega in self.omega:
                         value = vector[omega]
+                        if not omega in beliefs:
+                            continue
                         for b in beliefs.distributions[beliefs.keyMap[omega]].domain():
                             if b[omega] == value:
                                 break
