@@ -325,10 +325,16 @@ class World(object):
             for name,decision in decisions:
                 actions[name] = decision['policy']
         else:
+            # if no one has decided yet, agents' decisions should be independent
+            if actions is None:
+                turn = {}
+            else:
+                turn = copy.copy(actions)
+
             for name in toDecide:
                 # This agent might have a turn now
                 agent = self.agents[name]
-                decision = self.agents[name].decide(state,horizon,actions,None,tiebreak,
+                decision = self.agents[name].decide(state,horizon,turn,None,tiebreak,
                                                     agent.getActions(state),debug=debug.get(name,{}))
                 try:
                     actions[name] = decision['policy']
