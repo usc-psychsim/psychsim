@@ -7,7 +7,7 @@ from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedro.sequeira@sri.com'
-__description__ = 'Example of using theory-of-min in a game-theory scenario involving two agents in the Prisoner\'s' \
+__description__ = 'Example of using theory-of-mind in a game-theory scenario involving two agents in the Prisoner\'s' \
                   'Dilemma (https://en.wikipedia.org/wiki/Prisoner%27s_dilemma). ' \
                   'Both agents should choose the "defect" action which is rationally optimal, independently of the' \
                   'other agent\'s action.'

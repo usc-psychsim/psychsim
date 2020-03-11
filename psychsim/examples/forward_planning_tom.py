@@ -2,29 +2,29 @@ from psychsim.agent import Agent
 from psychsim.helper_functions import multi_compare_row, set_constant_reward, get_true_model_name, \
     get_decision_info, explain_decisions, get_feature_values
 from psychsim.probability import Distribution
-from psychsim.pwl import makeTree, equalRow, setToConstantMatrix, equalFeatureRow
+from psychsim.pwl import makeTree, equalRow, setToConstantMatrix
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedro.sequeira@sri.com'
-__description__ = 'Example of using theory-of-min in a game-theory scenario involving two agents in the Chicken Game' \
-                  '(https://en.wikipedia.org/wiki/Chicken_(game)#Game_theoretic_applications). ' \
-                  'Both agents should choose the "defect" action which is rationally optimal.'
+__description__ = 'Example of using theory-of-mind in a game-theory scenario involving two agents in the iterated' \
+                  'version of the Prisoner\'s dilemma ' \
+                  '(https://en.wikipedia.org/wiki/Prisoner%27s_dilemma#The_iterated_prisoner%27s_dilemma)' \
+                  'Both agents follow a strategy inspired on tit-for-tat (https://en.wikipedia.org/wiki/Tit_for_tat)' \
+                  'Namely, the first action is open and depends on the ' \
+                  'beliefs of the agent about the other\'s behavior. From there on, retaliation is applied by always ' \
+                  'choosing defect after the first defection of the other agent (non-forgiving).' \
+                  'Hence the planning horizon has an influence on the agents\' decision to cooperate or defect:' \
+                  '- if horizon is 0, first action for each agent will be random (0 reward), then tit-fot-tat' \
+                  '- if horizon is 1, agents will always defect (one-shot decision, other\'s action does not matter' \
+                  '- if horizon is >1, agents will always cooperate because they can see each other\'s tit-for-tat ' \
+                  'strategy using ToM, and hence believe the other will cooperate if they also cooperate, leading to ' \
+                  'highest mutual payoff.' \
+                  'Note: imperfect models can break this belief and make the agents cynical towards each other.'
 
+MAX_HORIZON = 3
 NUM_STEPS = 4
 TIEBREAK = 'random'  # when values of decisions are the same, choose randomly
-
-# # action indexes
-# NOT_DECIDED = 0
-# STRAIGHT = 1
-# SWERVE_RIGHT = 2
-
-# # parameters (payoffs according to the Chicken Game)
-# CHICKEN = -1  # RS
-# DARE = 1  # SR
-# MUTUAL_COOP = 0  # RR
-# PUNISHMENT = -10  # SS
-# INVALID = -10000
 
 # action indexes
 NOT_DECIDED = 0
@@ -38,21 +38,6 @@ MUTUAL_COOP = -1  # CC
 PUNISHMENT = -3  # DD
 INVALID = -10000
 
-
-# # defines a payoff matrix tree (0 = didn't decide, 1 = go straight, 2 = swerve right)
-# def get_reward_tree(agent, my_dec, other_dec):
-#     return makeTree({'if': multi_compare_row({my_dec: 1}, NOT_DECIDED),  # if dec >= 0
-#                      True: {'if': multi_compare_row({my_dec: -1}, NOT_DECIDED),  # if dec == 0, did not yet decide
-#                             True: set_constant_reward(agent, INVALID),
-#                             False: {'if': equalRow(my_dec, SWERVE_RIGHT),  # if dec >=2, I cooperated
-#                                     True: {'if': equalRow(other_dec, SWERVE_RIGHT),  # if other cooperated
-#                                            True: set_constant_reward(agent, MUTUAL_COOP),  # both cooperated
-#                                            False: set_constant_reward(agent, CHICKEN)},
-#                                     False: {'if': equalRow(other_dec, SWERVE_RIGHT),
-#                                             # if I defected and other cooperated
-#                                             True: set_constant_reward(agent, DARE),
-#                                             False: set_constant_reward(agent, PUNISHMENT)}}},  # both defected
-#                      False: set_constant_reward(agent, INVALID)})  # invalid
 
 # defines a payoff matrix tree (0 = didn't decide, 1 = Defected, 2 = Cooperated)
 def get_reward_tree(agent, my_dec, other_dec):
@@ -70,17 +55,6 @@ def get_reward_tree(agent, my_dec, other_dec):
                      False: set_constant_reward(agent, INVALID)})  # invalid
 
 
-# # gets a state description
-# def get_state_desc(world, dec_feature):
-#     decision = get_feature_values(world.getFeature(dec_feature))[0][0]
-#     if decision == NOT_DECIDED:
-#         return 'N/A'
-#     if decision == STRAIGHT:
-#         return 'went straight'
-#     if decision == SWERVE_RIGHT:
-#         return 'swerved right'
-
-# gets a state description
 def get_state_desc(world, dec_feature):
     decision = get_feature_values(world.getFeature(dec_feature))[0][0]
     if decision == NOT_DECIDED:
@@ -105,7 +79,6 @@ if __name__ == '__main__':
     for agent in agents:
         # set agent's params
         agent.setAttribute('discount', 1)
-        agent.setHorizon(2)
         agent.setRecursiveLevel(1)
 
         # add "decision" variable (0 = didn't decide, 1 = Defected, 2 = Cooperated)
@@ -113,24 +86,31 @@ if __name__ == '__main__':
         world.setFeature(dec, NOT_DECIDED)
         agents_dec.append(dec)
 
-    # define agents' actions:
+    # define agents' actions inspired on tit-for-tat: first decision is open, then retaliate non-cooperation.
+    # as soon as one agent defects it will always defect from there on
     for i, agent in enumerate(agents):
-        dec = agents_dec[i]
+        my_dec = agents_dec[i]
+        other_dec = agents_dec[0 if i == 1 else 1]
 
-        # defect is always available
-        action = agent.addAction({'verb': '', 'action': 'defect'})
-        tree = makeTree(setToConstantMatrix(dec, DEFECTED))
-        world.setDynamics(dec, action, tree)
-
-        # cooperate based on tit-for-tat: only available if agent did not decide yet or cooperated before,
-        # otherwise agent will always defect
-        other_ag_idx = 0 if i == 1 else 1
-        action = agent.addAction({'verb': '', 'action': 'cooperate'},
-                                 makeTree({'if': equalRow(agents_dec[other_ag_idx], DEFECTED),
-                                           True: False,
+        # defect (not legal if other has cooperated before, legal only if agent itself did not defect before)
+        action = agent.addAction({'verb': '', 'action': 'defect'},
+                                 makeTree({'if': equalRow(other_dec, COOPERATED),
+                                           True: {'if': equalRow(my_dec, DEFECTED),
+                                                  True: True,
+                                                  False: False},
                                            False: True}))
-        tree = makeTree(setToConstantMatrix(dec, COOPERATED))
-        world.setDynamics(dec, action, tree)
+        tree = makeTree(setToConstantMatrix(my_dec, DEFECTED))
+        world.setDynamics(my_dec, action, tree)
+
+        # cooperate (not legal if other or agent itself defected before)
+        action = agent.addAction({'verb': '', 'action': 'cooperate'},
+                                 makeTree({'if': equalRow(other_dec, DEFECTED),
+                                           True: False,
+                                           False: {'if': equalRow(my_dec, DEFECTED),
+                                                   True: False,
+                                                   False: True}}))
+        tree = makeTree(setToConstantMatrix(my_dec, COOPERATED))
+        world.setDynamics(my_dec, action, tree)
 
     # defines payoff matrices (equal to both agents)
     agent1.setReward(get_reward_tree(agent1, agents_dec[0], agents_dec[1]), 1)
@@ -144,19 +124,29 @@ if __name__ == '__main__':
     world.setMentalModel(agent1.name, agent2.name, Distribution({get_true_model_name(agent2): 1}))
     world.setMentalModel(agent2.name, agent1.name, Distribution({get_true_model_name(agent1): 1}))
 
-    for i in range(NUM_STEPS):
-
-        # decision per step (1 per agent): cooperate or defect?
+    for h in range(MAX_HORIZON + 1):
         print('====================================')
-        print('Step {}'.format(i))
-        step = world.step(tiebreak=TIEBREAK)
-        for j in range(len(agents)):
-            print('{0}: {1}'.format(agents[j].name, get_state_desc(world, agents_dec[j])))
+        print('Horizon {}'.format(h))
 
-        # print('________________________________')
-        # world.explain(step, level=2) # todo step does not provide outcomes anymore
+        # set horizon (also to the true model!) and reset decisions
+        for i in range(len(agents)):
+            agents[i].setHorizon(h)
+            agents[i].setHorizon(h, get_true_model_name(agents[i]))
+            world.setFeature(agents_dec[i], NOT_DECIDED)
 
-        # print('\n') #todo step does not provide outcomes anymore
-        # for i in range(len(agents)):
-        #     decision_infos = get_decision_info(step, agents[i].name)
-        #     explain_decisions(agents[i].name, decision_infos)
+        for t in range(NUM_STEPS):
+
+            # decision per step (1 per agent): cooperate or defect?
+            print('---------------------')
+            print('Step {}'.format(t))
+            step = world.step(tiebreak=TIEBREAK)
+            for i in range(len(agents)):
+                print('{0}: {1}'.format(agents[i].name, get_state_desc(world, agents_dec[i])))
+
+            # print('________________________________')
+            # world.explain(step, level=2) # todo step does not provide outcomes anymore
+
+            # print('\n') #todo step does not provide outcomes anymore
+            # for i in range(len(agents)):
+            #     decision_infos = get_decision_info(step, agents[i].name)
+            #     explain_decisions(agents[i].name, decision_infos)
