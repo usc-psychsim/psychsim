@@ -2,18 +2,29 @@ from psychsim.agent import Agent
 from psychsim.helper_functions import multi_compare_row, set_constant_reward, get_true_model_name, \
     get_decision_info, explain_decisions, get_feature_values
 from psychsim.probability import Distribution
-from psychsim.pwl import makeTree, equalRow, setToConstantMatrix
+from psychsim.pwl import makeTree, equalRow, setToConstantMatrix, equalFeatureRow
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedro.sequeira@sri.com'
-__description__ = 'Example of using theory-of-min in a game-theory scenario involving two agents in the Prisoner\'s' \
-                  'Dilemma (https://en.wikipedia.org/wiki/Prisoner%27s_dilemma). ' \
-                  'Both agents should choose the "defect" action which is rationally optimal, independently of the' \
-                  'other agent\'s action.'
+__description__ = 'Example of using theory-of-min in a game-theory scenario involving two agents in the Chicken Game' \
+                  '(https://en.wikipedia.org/wiki/Chicken_(game)#Game_theoretic_applications). ' \
+                  'Both agents should choose the "defect" action which is rationally optimal.'
 
-NUM_STEPS = 3
-TIEBREAK = 'random'     # when values of decisions are the same, choose randomly
+NUM_STEPS = 4
+TIEBREAK = 'random'  # when values of decisions are the same, choose randomly
+
+# # action indexes
+# NOT_DECIDED = 0
+# STRAIGHT = 1
+# SWERVE_RIGHT = 2
+
+# # parameters (payoffs according to the Chicken Game)
+# CHICKEN = -1  # RS
+# DARE = 1  # SR
+# MUTUAL_COOP = 0  # RR
+# PUNISHMENT = -10  # SS
+# INVALID = -10000
 
 # action indexes
 NOT_DECIDED = 0
@@ -21,17 +32,32 @@ DEFECTED = 1
 COOPERATED = 2
 
 # payoff parameters (according to PD)
-SUCKER = -3  # CD
+SUCKER = -5  # CD
 TEMPTATION = 0  # DC
 MUTUAL_COOP = -1  # CC
-PUNISHMENT = -2  # DD
+PUNISHMENT = -3  # DD
 INVALID = -10000
 
+
+# # defines a payoff matrix tree (0 = didn't decide, 1 = go straight, 2 = swerve right)
+# def get_reward_tree(agent, my_dec, other_dec):
+#     return makeTree({'if': multi_compare_row({my_dec: 1}, NOT_DECIDED),  # if dec >= 0
+#                      True: {'if': multi_compare_row({my_dec: -1}, NOT_DECIDED),  # if dec == 0, did not yet decide
+#                             True: set_constant_reward(agent, INVALID),
+#                             False: {'if': equalRow(my_dec, SWERVE_RIGHT),  # if dec >=2, I cooperated
+#                                     True: {'if': equalRow(other_dec, SWERVE_RIGHT),  # if other cooperated
+#                                            True: set_constant_reward(agent, MUTUAL_COOP),  # both cooperated
+#                                            False: set_constant_reward(agent, CHICKEN)},
+#                                     False: {'if': equalRow(other_dec, SWERVE_RIGHT),
+#                                             # if I defected and other cooperated
+#                                             True: set_constant_reward(agent, DARE),
+#                                             False: set_constant_reward(agent, PUNISHMENT)}}},  # both defected
+#                      False: set_constant_reward(agent, INVALID)})  # invalid
 
 # defines a payoff matrix tree (0 = didn't decide, 1 = Defected, 2 = Cooperated)
 def get_reward_tree(agent, my_dec, other_dec):
     return makeTree({'if': multi_compare_row({my_dec: 1}, NOT_DECIDED),  # if dec >= 0
-                     True: {'if': multi_compare_row({my_dec: -1}, NOT_DECIDED),  # if dec == 0, did not yet decide
+                     True: {'if': multi_compare_row({my_dec: -1}, NOT_DECIDED),  # if dec <= 0, did not yet decide
                             True: set_constant_reward(agent, INVALID),
                             False: {'if': equalRow(my_dec, COOPERATED),  # if dec >=2, I cooperated
                                     True: {'if': equalRow(other_dec, COOPERATED),  # if other cooperated
@@ -43,6 +69,16 @@ def get_reward_tree(agent, my_dec, other_dec):
                                             False: set_constant_reward(agent, PUNISHMENT)}}},  # both defected
                      False: set_constant_reward(agent, INVALID)})  # invalid
 
+
+# # gets a state description
+# def get_state_desc(world, dec_feature):
+#     decision = get_feature_values(world.getFeature(dec_feature))[0][0]
+#     if decision == NOT_DECIDED:
+#         return 'N/A'
+#     if decision == STRAIGHT:
+#         return 'went straight'
+#     if decision == SWERVE_RIGHT:
+#         return 'swerved right'
 
 # gets a state description
 def get_state_desc(world, dec_feature):
@@ -69,7 +105,7 @@ if __name__ == '__main__':
     for agent in agents:
         # set agent's params
         agent.setAttribute('discount', 1)
-        agent.setHorizon(1)
+        agent.setHorizon(2)
         agent.setRecursiveLevel(1)
 
         # add "decision" variable (0 = didn't decide, 1 = Defected, 2 = Cooperated)
@@ -77,15 +113,26 @@ if __name__ == '__main__':
         world.setFeature(dec, NOT_DECIDED)
         agents_dec.append(dec)
 
-        # define agents' actions (defect and cooperate)
+    # define agents' actions:
+    for i, agent in enumerate(agents):
+        dec = agents_dec[i]
+
+        # defect is always available
         action = agent.addAction({'verb': '', 'action': 'defect'})
         tree = makeTree(setToConstantMatrix(dec, DEFECTED))
         world.setDynamics(dec, action, tree)
-        action = agent.addAction({'verb': '', 'action': 'cooperate'})
+
+        # cooperate based on tit-for-tat: only available if agent did not decide yet or cooperated before,
+        # otherwise agent will always defect
+        other_ag_idx = 0 if i == 1 else 1
+        action = agent.addAction({'verb': '', 'action': 'cooperate'},
+                                 makeTree({'if': equalRow(agents_dec[other_ag_idx], DEFECTED),
+                                           True: False,
+                                           False: True}))
         tree = makeTree(setToConstantMatrix(dec, COOPERATED))
         world.setDynamics(dec, action, tree)
 
-    # defines payoff matrices
+    # defines payoff matrices (equal to both agents)
     agent1.setReward(get_reward_tree(agent1, agents_dec[0], agents_dec[1]), 1)
     agent2.setReward(get_reward_tree(agent2, agents_dec[1], agents_dec[0]), 1)
 

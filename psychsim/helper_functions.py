@@ -1,4 +1,5 @@
 from psychsim.agent import Agent
+from psychsim.probability import Distribution
 from psychsim.pwl import KeyedMatrix, KeyedVector, makeFuture, KeyedPlane, setToConstantMatrix, rewardKey
 
 __author__ = 'Pedro Sequeira, Stacy Marsella'
@@ -37,6 +38,27 @@ def set_constant_reward(agent, value):
     :return: a matrix that allows setting the agent's reward to the given constant value.
     """
     return setToConstantMatrix(rewardKey(agent.name), value)
+
+
+def get_true_model_name(agent):
+    """
+    Gets the name of the "True" model associated with the given agent.
+    Node: this depends on the internals of PsychSim, so this function should probably be moved inside Agent.py.
+    :param Agent agent: the agent whose true model we want to retrieve.
+    :rtype: str
+    :return: the name of true model of the given agent.
+    """
+    return '{}0'.format(agent.name)
+
+
+def get_feature_values(feature):
+    """
+    Gets all the values associated with the given feature and corresponding probabilities.
+    :param Distribution feature: the state feature, i.e., a probability distribution over values.
+    :rtype list[tuple]
+    :return: a list containing tuples in the form (value, probability) for each value associated with the given feature.
+    """
+    return list(zip(feature._domain.values(), feature.values()))
 
 
 class DecisionInfo(object):

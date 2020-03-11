@@ -1,6 +1,6 @@
 from psychsim.agent import Agent
 from psychsim.world import World
-from psychsim.helper_functions import multi_set_matrix, get_decision_info, explain_decisions
+from psychsim.helper_functions import multi_set_matrix, get_decision_info, explain_decisions, get_feature_values
 from psychsim.pwl import makeTree, setToFeatureMatrix
 from psychsim.reward import achieveFeatureValue, CONSTANT
 
@@ -11,7 +11,7 @@ __description__ = 'Simple forward planning (discounted) example involving a sing
                   'it "sees" it\'s best to go right to later achieve a higher reward.'
 
 # parameters
-MAX_HORIZON = 3
+MAX_HORIZON = 5
 DISCOUNT = 0.9
 
 if __name__ == '__main__':
@@ -49,7 +49,6 @@ if __name__ == '__main__':
     for i in range(MAX_HORIZON + 1):
         print('====================================')
         print('Horizon: {}'.format(str(i)))
-        print('====================================')
 
         # reset
         world.setFeature(pos, 0)
@@ -57,8 +56,8 @@ if __name__ == '__main__':
 
         # single decision: left or right?
         step = world.step()
-        print(step)
-        world.printState()
+        # print(step)
+        print('Position: {}'.format(get_feature_values(world.getFeature(pos))[0][0]))
         # world.explain(step, level=3) # todo not working, cannot retrieve old 'outcomes' from step
 
         # print('\n')

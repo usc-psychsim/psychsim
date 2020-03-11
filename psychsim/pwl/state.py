@@ -52,7 +52,7 @@ class VectorDistributionSet:
             value = self.__class__()
             value.keyMap.update(self.keyMap)
             for substate in substates:
-                element = domains[substate][int(i % len(domains[substate]))]
+                element = domains[substate][i % len(domains[substate])]
                 prob = self.distributions[substate][element]
                 i //= len(domains[substate])
                 value.distributions[substate] = VectorDistribution({element: prob})
