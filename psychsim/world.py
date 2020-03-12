@@ -351,7 +351,7 @@ class World(object):
             for name in toDecide:
                 # This agent might have a turn now
                 agent = self.agents[name]
-                decision = self.agents[name].decide(state,horizon,turn,None,tiebreak,
+                decision = self.agents[name].decide(state,horizon,None,None,tiebreak,
                                                     agent.getActions(state),debug=debug.get(name,{}))
                 try:
                     actions[name] = decision['policy']
