@@ -1,9 +1,16 @@
+import itertools
+
+import numpy as np
 from psychsim.agent import Agent
 from psychsim.probability import Distribution
 from psychsim.pwl import KeyedMatrix, KeyedVector, makeFuture, KeyedPlane, setToConstantMatrix, rewardKey
 
 __author__ = 'Pedro Sequeira, Stacy Marsella'
 __email__ = 'pedro.sequeira@sri.com'
+
+"""
+    PWL UTILITIES
+"""
 
 
 def multi_set_matrix(key, scaled_keys):
@@ -40,6 +47,11 @@ def set_constant_reward(agent, value):
     return setToConstantMatrix(rewardKey(agent.name), value)
 
 
+"""
+    OTHER PSYCHSIM UTILITIES
+"""
+
+
 def get_true_model_name(agent):
     """
     Gets the name of the "True" model associated with the given agent.
@@ -59,6 +71,135 @@ def get_feature_values(feature):
     :return: a list containing tuples in the form (value, probability) for each value associated with the given feature.
     """
     return list(zip(feature._domain.values(), feature.values()))
+
+
+"""
+    NON-LINEAR DYNAMICS UTILITIES
+"""
+
+
+def get_univariate_samples(fnc, min_x, max_x, num_samples):
+    """
+    Creates samples for the given univariate function in some interval.
+    :param callable fnc: the function to get samples from.
+    :param float min_x: the minimal parameter value of the sample.
+    :param float max_x: the maximal parameter value of the sample (inclusive).
+    :param int num_samples: the number of samples to get from the function.
+    :rtype: (np.ndarray, np.ndarray)
+    :return: a tuple containing the parameters and the corresponding samples for the given function.
+    """
+    x_args = np.linspace(min_x, max_x, num_samples)
+    return x_args, np.array([fnc(arg) for arg in x_args])
+
+
+def get_bivariate_samples(fnc, min_x, max_x, min_y, max_y, num_x_samples, num_y_samples):
+    """
+    Creates samples for the given bivariate function in some interval.
+    :param callable fnc: the function to get samples from.
+    :param float min_x: the minimal x parameter value of the sample.
+    :param float max_x: the maximal x parameter value of the sample (inclusive).
+    :param float min_y: the minimal y parameter value of the sample.
+    :param float max_y: the maximal y parameter value of the sample (inclusive).
+    :param int num_x_samples: the number of samples to get from the function in the x-axis.
+    :param int num_y_samples: the number of samples to get from the function in the y-axis.
+    :rtype: (np.ndarray, np.ndarray, np.ndarray)
+    :return: a tuple containing the x parameters (num_x_samples, ), the y parameters (num_y_samples, ) and an array of
+    shape (num_x_samples, num_y_samples) containing the corresponding sample values for the given function.
+    """
+    x_args = np.linspace(min_x, max_x, num_x_samples)
+    y_args = np.linspace(min_y, max_y, num_y_samples)
+    return x_args, y_args, np.array([[fnc(x, y) for y in y_args] for x in x_args])
+
+
+def tree_from_univariate_samples(set_var, x_var, x_params, sample_values, idx_min=0, idx_max=-1):
+    """
+    Creates a PWL dynamics tree that sets the value of one feature according to the value of another as provided by a
+    given set of samples. This a recursive function that creates a binary search tree to determine the "best match" for
+    the value of the parameter feature.
+    :param str set_var: the feature (named key) on which to store the approximation.
+    :param str x_var: the feature (named key) providing the parameter value from which to calculate the approximation.
+    :param np.ndarray x_params: an array of shape (num_samples, ) containing the values for the parameters.
+    :param np.ndarray sample_values: an array of shape (num_samples, ) with the function values for each parameter value.
+    :param int idx_min: the lower index of the current binary search.
+    :param int idx_max: the upper index of the current binary search. -1 corresponds to num_samples - 1.
+    :rtype: dict
+    :return: a dictionary to be used with makeTree to define the dynamics of the approximation of the function that
+    produced the given samples.
+    """
+    # checks indexes
+    if idx_max == -1:
+        idx_max = len(x_params) - 1
+
+    # checks termination (leaf), sets to index's value
+    if idx_min == idx_max:
+        return setToConstantMatrix(set_var, sample_values[idx_max])
+
+    # builds binary search tree
+    idx = (idx_max + idx_min) // 2
+    x = x_params[idx]
+    return {'if': multi_compare_row({x_var: -1}, -x),  # if var is less than x
+            True: tree_from_univariate_samples(
+                set_var, x_var, x_params, sample_values, idx_min, idx),  # search left
+            False: tree_from_univariate_samples(
+                set_var, x_var, x_params, sample_values, idx + 1, idx_max)}  # search right
+
+
+def tree_from_bivariate_samples(
+        set_var, x_var, y_var, x_params, y_params, sample_values, idx_x_min=0, idx_x_max=-1, idx_y_min=0, idx_y_max=-1):
+    """
+    Creates a PWL dynamics tree that sets the value of one feature according to the value of two other as provided by a
+    given set of samples. This a recursive function that creates two intertwined binary search trees to determine the
+    "best match" for the value of the parameter feature pair.
+    :param str set_var: the feature (named key) on which to store the approximation.
+    :param str x_var: the feature (named key) providing the x-parameter value from which to calculate the approximation.
+    :param str y_var: the feature (named key) providing the y-parameter value from which to calculate the approximation.
+    :param np.ndarray x_params: an array of shape (num_x_samples, ) containing the values for the x parameters.
+    :param np.ndarray y_params: an array of shape (num_y_samples, ) containing the values for the y parameters.
+    :param np.ndarray sample_values: an array of shape (num_x_samples, num_y_samples) with the function values for each
+    parameter pair.
+    :param int idx_x_min: the lower x-index of the current binary search.
+    :param int idx_x_max: the upper x-index of the current binary search. -1 corresponds to num_x_samples - 1.
+    :param int idx_y_min: the lower y-index of the current binary search.
+    :param int idx_y_max: the upper y-index of the current binary search. -1 corresponds to num_y_samples - 1.
+    :rtype: dict
+    :return: a dictionary to be used with makeTree to define the dynamics of the approximation of the function that
+    produced the given samples.
+    """
+    # checks indexes
+    if idx_x_max == -1:
+        idx_x_max = len(x_params) - 1
+    if idx_y_max == -1:
+        idx_y_max = len(y_params) - 1
+
+    # checks termination (leaf), sets to index's value
+    if idx_x_min == idx_x_max and idx_y_min == idx_y_max:
+        return setToConstantMatrix(set_var, sample_values[idx_x_max, idx_y_max])
+
+    # tests for hyperplane in x_axis, performs binary search in y-axis
+    if idx_x_min == idx_x_max:
+        idx_y = (idx_y_max + idx_y_min) // 2
+        y = y_params[idx_y]
+        return {'if': multi_compare_row({y_var: -1}, -y),  # if y var is less than y
+                True: tree_from_bivariate_samples(  # search left
+                    set_var, x_var, y_var, x_params, y_params, sample_values, idx_x_min, idx_x_max, idx_y_min, idx_y),
+
+                False: tree_from_bivariate_samples(  # search right
+                    set_var, x_var, y_var, x_params, y_params, sample_values, idx_x_min, idx_x_max, idx_y + 1,
+                    idx_y_max)}
+
+    # otherwise performs binary search in x-axis
+    idx_x = (idx_x_max + idx_x_min) // 2
+    x = x_params[idx_x]
+    return {'if': multi_compare_row({x_var: -1}, -x),  # if x var is less than x
+            True: tree_from_bivariate_samples(  # search left
+                set_var, x_var, y_var, x_params, y_params, sample_values, idx_x_min, idx_x, idx_y_min, idx_y_max),
+            False: tree_from_bivariate_samples(  # search right
+                set_var, x_var, y_var, x_params, y_params, sample_values, idx_x + 1, idx_x_max, idx_y_min, idx_y_max)}
+
+
+"""
+    EXPLANATION UTILITIES
+"""
 
 
 class DecisionInfo(object):

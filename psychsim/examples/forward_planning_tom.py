@@ -32,10 +32,10 @@ DEFECTED = 1
 COOPERATED = 2
 
 # payoff parameters (according to PD)
-SUCKER = -5  # CD
+SUCKER = -3  # CD
 TEMPTATION = 0  # DC
 MUTUAL_COOP = -1  # CC
-PUNISHMENT = -3  # DD
+PUNISHMENT = -2  # DD
 INVALID = -10000
 
 
