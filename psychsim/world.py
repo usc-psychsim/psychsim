@@ -175,7 +175,24 @@ class World(object):
         state.rollback()
 #        if select:
 #            prob = state.select(select=='max')
-        effect = self.effect(joint,state,updateBeliefs,keySubset,select)
+        if updateBeliefs:
+            # Update agent models included in the original world
+            # (after finding out possible new worlds)
+            if isinstance(state,VectorDistributionSet):
+                agentsModeled = [name for name in self.agents
+                                 if modelKey(name) in state.keyMap and self.agents[name].omega is not True]
+            else:
+                agentsModeled = [name for name in self.agents
+                                 if modelKey(name) in state and self.agents[name].omega is not True]
+            for name in agentsModeled:
+                key = modelKey(name)
+                agent = self.agents[name]
+                if isinstance(state,VectorDistributionSet):
+                    substate = state.collapse(agent.omega|{key},False)
+                delta = agent.updateBeliefs(state,joint,horizon=horizon)
+                if delta:
+                    if select:
+                        state.distributions[substate].select(select == 'max')
         # The future becomes the present
         state.rollback()
         if isinstance(state,VectorDistributionSet):
@@ -334,7 +351,7 @@ class World(object):
             for name in toDecide:
                 # This agent might have a turn now
                 agent = self.agents[name]
-                decision = self.agents[name].decide(state,horizon,turn,None,tiebreak,
+                decision = self.agents[name].decide(state,horizon,None,None,tiebreak,
                                                     agent.getActions(state),debug=debug.get(name,{}))
                 try:
                     actions[name] = decision['policy']
@@ -452,7 +469,7 @@ class World(object):
                         state[makeFuture(key)] = select[key]
         return state
                 
-    def effect(self,actions,state,updateBeliefs=True,keySubset=None,select=False):
+    def effect(self,actions,state,updateBeliefs=True,keySubset=None,select=False,horizon=None):
 #        if not isinstance(state,VectorDistributionSet):
 #            state = psychsim.pwl.VectorDistributionSet(state)
         result = {'new': state,'effect': []}
@@ -470,7 +487,7 @@ class World(object):
                 agent = self.agents[name]
                 if isinstance(result['new'],VectorDistributionSet):
                     substate = result['new'].collapse(agent.omega|{key},False)
-                delta = agent.updateBeliefs(result['new'],actions)
+                delta = agent.updateBeliefs(result['new'],actions,horizon=horizon)
                 if delta:
                     result['effect'].append(delta)
                     if select:
@@ -586,7 +603,7 @@ class World(object):
             subtree = remaining.pop()
             if subtree.isLeaf():
                 if isinstance(subtree.children[None],bool):
-                    msg = 'Use set%sMatrix(psychsim.keys.TERMINATED) instead of %s' % \
+                    msg = 'Use set%sMatrix(psychsim.pwl.keys.TERMINATED) instead of %s' % \
                           (subtree.children[None],subtree.children[None])
                     raise DeprecationWarning(msg)
             elif subtree.isProbabilistic():
