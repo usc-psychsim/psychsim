@@ -22,6 +22,7 @@ __description__ = 'Example of using theory-of-mind in a game-theory scenario inv
                   'highest mutual payoff.' \
                   'Note: imperfect models can break this belief and make the agents cynical towards each other.'
 
+# parameters
 MAX_HORIZON = 3
 NUM_STEPS = 4
 TIEBREAK = 'random'  # when values of decisions are the same, choose randomly

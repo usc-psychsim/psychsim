@@ -1,9 +1,9 @@
-import itertools
-
 import numpy as np
+from psychsim.action import ActionSet
 from psychsim.agent import Agent
 from psychsim.probability import Distribution
-from psychsim.pwl import KeyedMatrix, KeyedVector, makeFuture, KeyedPlane, setToConstantMatrix, rewardKey
+from psychsim.pwl import KeyedMatrix, KeyedVector, makeFuture, KeyedPlane, setToConstantMatrix, rewardKey, modelKey, \
+    equalRow, makeTree
 
 __author__ = 'Pedro Sequeira, Stacy Marsella'
 __email__ = 'pedro.sequeira@sri.com'
@@ -45,6 +45,57 @@ def set_constant_reward(agent, value):
     :return: a matrix that allows setting the agent's reward to the given constant value.
     """
     return setToConstantMatrix(rewardKey(agent.name), value)
+
+
+"""
+    ACTION UTILITIES
+"""
+
+
+def set_action_legality(agent, action, legality=True, models=None):
+    """
+    Sets legality for an action for the given agent and model.
+    :param Agent agent: the agent whose model(s) we want to set the action legality.
+    :param ActionSet action: the action for which to set the legality.
+    :param bool legality: whether to set this action legal (True) or illegal (False)
+    :param list[str] models: the list of models for which to set the action legality. None will set to the agent itself.
+    """
+    # tests for "true" model
+    if models is None or len(models) == 0:
+        agent.setLegal(action, makeTree(legality))
+        return
+
+    model_key = modelKey(agent.name)
+
+    # initial tree (end condition is: 'not legality')
+    tree = not legality
+
+    # recursively builds legality tree by comparing the model's key with the index of the model in the state/vector
+    for model in models:
+        tree = {'if': equalRow(model_key, agent.model2index(model)),
+                True: legality,
+                False: tree}
+    agent.setLegal(action, makeTree(tree))
+
+
+def set_illegal_action(agent, action, models=None):
+    """
+    Sets an illegal action for the given agent model only.
+    :param Agent agent: the agent whose models we want to set the action legality.
+    :param ActionSet action: the action for which to set the legality.
+    :param list[str] models: the list of models for which to set the action legality. None will set to the agent itself.
+    """
+    set_action_legality(agent, action, False, models)
+
+
+def set_legal_action(agent, action, models=None):
+    """
+    Sets a legal action for the given agent model only.
+    :param Agent agent: the agent whose models we want to set the action legality.
+    :param ActionSet action: the action for which to set the legality.
+    :param list[str] models: the list of models for which to set the action legality. None will set to the agent itself.
+    """
+    set_action_legality(agent, action, True, models)
 
 
 """
