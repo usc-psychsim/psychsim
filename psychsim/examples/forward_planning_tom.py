@@ -1,3 +1,5 @@
+import logging
+import os
 from psychsim.agent import Agent
 from psychsim.helper_functions import multi_compare_row, set_constant_reward, get_true_model_name, \
     get_decision_info, explain_decisions, get_feature_values
@@ -39,6 +41,8 @@ MUTUAL_COOP = -1  # CC
 PUNISHMENT = -2  # DD
 INVALID = -10000
 
+LOG_FILE = 'output/fwd_planning_tom.log'
+
 
 # defines a payoff matrix tree (0 = didn't decide, 1 = Defected, 2 = Cooperated)
 def get_reward_tree(agent, my_dec, other_dec):
@@ -67,6 +71,13 @@ def get_state_desc(world, dec_feature):
 
 
 if __name__ == '__main__':
+
+    # sets up log
+    out_dir = os.path.dirname(LOG_FILE)
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+    logging.basicConfig(format='[%(asctime)s %(levelname)s] %(message)s', level=logging.INFO,
+                        handlers=[logging.StreamHandler(), logging.FileHandler(LOG_FILE, 'w')])
 
     # create world and add agent
     world = World()
@@ -125,9 +136,11 @@ if __name__ == '__main__':
     world.setMentalModel(agent1.name, agent2.name, Distribution({get_true_model_name(agent2): 1}))
     world.setMentalModel(agent2.name, agent1.name, Distribution({get_true_model_name(agent1): 1}))
 
+    # save log
+
     for h in range(MAX_HORIZON + 1):
-        print('====================================')
-        print('Horizon {}'.format(h))
+        logging.info('====================================')
+        logging.info('Horizon {}'.format(h))
 
         # set horizon (also to the true model!) and reset decisions
         for i in range(len(agents)):
@@ -138,11 +151,11 @@ if __name__ == '__main__':
         for t in range(NUM_STEPS):
 
             # decision per step (1 per agent): cooperate or defect?
-            print('---------------------')
-            print('Step {}'.format(t))
+            logging.info('---------------------')
+            logging.info('Step {}'.format(t))
             step = world.step(tiebreak=TIEBREAK)
             for i in range(len(agents)):
-                print('{0}: {1}'.format(agents[i].name, get_state_desc(world, agents_dec[i])))
+                logging.info('{0}: {1}'.format(agents[i].name, get_state_desc(world, agents_dec[i])))
 
             # print('________________________________')
             # world.explain(step, level=2) # todo step does not provide outcomes anymore

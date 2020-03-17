@@ -1,3 +1,5 @@
+import logging
+import os
 from psychsim.agent import Agent
 from psychsim.helper_functions import multi_compare_row, set_constant_reward, get_true_model_name, \
     get_decision_info, explain_decisions, get_feature_values
@@ -7,13 +9,13 @@ from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedro.sequeira@sri.com'
-__description__ = 'Example of using theory-of-mind in a game-theory scenario involving two agents in the Prisoner\'s' \
-                  'Dilemma (https://en.wikipedia.org/wiki/Prisoner%27s_dilemma). ' \
+__description__ = 'Example of using theory-of-mind in a game-theory scenario involving two agents in the Chicken ' \
+                  'Game (https://en.wikipedia.org/wiki/Chicken_(game)#Game_theoretic_applications). ' \
                   'Both agents should choose the "defect" action which is rationally optimal, independently of the' \
                   'other agent\'s action.'
 
 NUM_STEPS = 3
-TIEBREAK = 'random'     # when values of decisions are the same, choose randomly
+TIEBREAK = 'random'  # when values of decisions are the same, choose randomly
 
 # action indexes
 NOT_DECIDED = 0
@@ -21,11 +23,13 @@ DEFECTED = 1
 COOPERATED = 2
 
 # payoff parameters (according to PD)
-SUCKER = -3  # CD
-TEMPTATION = 0  # DC
-MUTUAL_COOP = -1  # CC
-PUNISHMENT = -2  # DD
+SUCKER = -1  # CD
+TEMPTATION = 1  # DC
+MUTUAL_COOP = 0  # CC
+PUNISHMENT = -1000  # DD
 INVALID = -10000
+
+LOG_FILE = 'output/gt_tom.log'
 
 
 # defines a payoff matrix tree (0 = didn't decide, 1 = Defected, 2 = Cooperated)
@@ -56,6 +60,13 @@ def get_state_desc(world, dec_feature):
 
 
 if __name__ == '__main__':
+
+    # sets up log
+    out_dir = os.path.dirname(LOG_FILE)
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+    logging.basicConfig(format='[%(asctime)s %(levelname)s] %(message)s', level=logging.INFO,
+                        handlers=[logging.StreamHandler(), logging.FileHandler(LOG_FILE, 'w')])
 
     # create world and add agent
     world = World()
@@ -100,11 +111,11 @@ if __name__ == '__main__':
     for i in range(NUM_STEPS):
 
         # decision per step (1 per agent): cooperate or defect?
-        print('====================================')
-        print('Step {}'.format(i))
+        logging.info('====================================')
+        logging.info('Step {}'.format(i))
         step = world.step(tiebreak=TIEBREAK)
         for j in range(len(agents)):
-            print('{0}: {1}'.format(agents[j].name, get_state_desc(world, agents_dec[j])))
+            logging.info('{0}: {1}'.format(agents[j].name, get_state_desc(world, agents_dec[j])))
 
         # print('________________________________')
         # world.explain(step, level=2) # todo step does not provide outcomes anymore
