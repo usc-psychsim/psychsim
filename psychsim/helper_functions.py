@@ -114,16 +114,6 @@ def get_true_model_name(agent):
     return '{}0'.format(agent.name)
 
 
-def get_feature_values(feature):
-    """
-    Gets all the values associated with the given feature and corresponding probabilities.
-    :param Distribution feature: the state feature, i.e., a probability distribution over values.
-    :rtype list[tuple]
-    :return: a list containing tuples in the form (value, probability) for each value associated with the given feature.
-    """
-    return list(zip(feature._domain.values(), feature.values()))
-
-
 """
     NON-LINEAR DYNAMICS UTILITIES
 """

@@ -2,7 +2,7 @@ import logging
 import os
 from psychsim.agent import Agent
 from psychsim.helper_functions import multi_compare_row, set_constant_reward, get_true_model_name, \
-    get_decision_info, explain_decisions, get_feature_values
+    get_decision_info, explain_decisions
 from psychsim.probability import Distribution
 from psychsim.pwl import makeTree, equalRow, setToConstantMatrix
 from psychsim.world import World
@@ -61,7 +61,7 @@ def get_reward_tree(agent, my_dec, other_dec):
 
 
 def get_state_desc(world, dec_feature):
-    decision = get_feature_values(world.getFeature(dec_feature))[0][0]
+    decision = world.getValue(dec_feature)
     if decision == NOT_DECIDED:
         return 'N/A'
     if decision == DEFECTED:

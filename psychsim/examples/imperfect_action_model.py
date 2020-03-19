@@ -3,7 +3,7 @@ from psychsim.probability import Distribution
 from psychsim.world import World
 from psychsim.pwl import makeTree, setToConstantMatrix
 from psychsim.helper_functions import multi_compare_row, set_constant_reward, set_illegal_action, set_legal_action, \
-    get_feature_values, get_true_model_name
+    get_true_model_name
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedro.sequeira@sri.com'
@@ -47,7 +47,7 @@ def get_reward_tree(agent, my_side, other_side):
 
 # gets a state description
 def get_state_desc(world, side):
-    result = get_feature_values(world.getFeature(side))[0][0]
+    result = world.getValue(side)
     if result == NOT_DECIDED:
         return 'N/A'
     if result == WENT_LEFT:

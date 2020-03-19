@@ -1,6 +1,6 @@
 from psychsim.agent import Agent
 from psychsim.world import World
-from psychsim.helper_functions import multi_set_matrix, get_decision_info, explain_decisions, get_feature_values
+from psychsim.helper_functions import multi_set_matrix, get_decision_info, explain_decisions
 from psychsim.pwl import makeTree, setToFeatureMatrix
 from psychsim.reward import achieveFeatureValue, CONSTANT
 
@@ -57,7 +57,7 @@ if __name__ == '__main__':
         # single decision: left or right?
         step = world.step()
         # print(step)
-        print('Position: {}'.format(get_feature_values(world.getFeature(pos))[0][0]))
+        print('Position: {}'.format(world.getValue(pos)))
         # world.explain(step, level=3) # todo not working, cannot retrieve old 'outcomes' from step
 
         # print('\n')

@@ -2,7 +2,7 @@ import logging
 import os
 from psychsim.agent import Agent
 from psychsim.helper_functions import multi_compare_row, set_constant_reward, get_true_model_name, \
-    get_decision_info, explain_decisions, get_feature_values
+    get_decision_info, explain_decisions
 from psychsim.probability import Distribution
 from psychsim.pwl import makeTree, equalRow, setToConstantMatrix
 from psychsim.world import World
@@ -19,8 +19,8 @@ TIEBREAK = 'random'  # when values of decisions are the same, choose randomly
 
 # action indexes
 NOT_DECIDED = 0
-DEFECTED = 1
-COOPERATED = 2
+WENT_STRAIGHT = 1
+SWERVED = 2
 
 # payoff parameters (according to PD)
 SUCKER = -1  # CD
@@ -32,16 +32,16 @@ INVALID = -10000
 LOG_FILE = 'output/gt_tom.log'
 
 
-# defines a payoff matrix tree (0 = didn't decide, 1 = Defected, 2 = Cooperated)
+# defines a payoff matrix tree (0 = didn't decide, 1 = went straight, 2 = swerved)
 def get_reward_tree(agent, my_dec, other_dec):
     return makeTree({'if': multi_compare_row({my_dec: 1}, NOT_DECIDED),  # if dec >= 0
                      True: {'if': multi_compare_row({my_dec: -1}, NOT_DECIDED),  # if dec == 0, did not yet decide
                             True: set_constant_reward(agent, INVALID),
-                            False: {'if': equalRow(my_dec, COOPERATED),  # if dec >=2, I cooperated
-                                    True: {'if': equalRow(other_dec, COOPERATED),  # if other cooperated
+                            False: {'if': equalRow(my_dec, SWERVED),  # if dec >=2, I cooperated
+                                    True: {'if': equalRow(other_dec, SWERVED),  # if other cooperated
                                            True: set_constant_reward(agent, MUTUAL_COOP),  # both cooperated
                                            False: set_constant_reward(agent, SUCKER)},
-                                    False: {'if': equalRow(other_dec, COOPERATED),
+                                    False: {'if': equalRow(other_dec, SWERVED),
                                             # if I defected and other cooperated
                                             True: set_constant_reward(agent, TEMPTATION),
                                             False: set_constant_reward(agent, PUNISHMENT)}}},  # both defected
@@ -50,13 +50,13 @@ def get_reward_tree(agent, my_dec, other_dec):
 
 # gets a state description
 def get_state_desc(world, dec_feature):
-    decision = get_feature_values(world.getFeature(dec_feature))[0][0]
+    decision = world.getValue(dec_feature)
     if decision == NOT_DECIDED:
         return 'N/A'
-    if decision == DEFECTED:
-        return 'defected'
-    if decision == COOPERATED:
-        return 'cooperated'
+    if decision == WENT_STRAIGHT:
+        return 'went straight'
+    if decision == SWERVED:
+        return 'swerved'
 
 
 if __name__ == '__main__':
@@ -83,17 +83,17 @@ if __name__ == '__main__':
         agent.setHorizon(1)
         agent.setRecursiveLevel(1)
 
-        # add "decision" variable (0 = didn't decide, 1 = Defected, 2 = Cooperated)
+        # add "decision" variable (0 = didn't decide, 1 = went straight, 2 = swerved)
         dec = world.defineState(agent.name, 'decision', int, lo=0, hi=2)
         world.setFeature(dec, NOT_DECIDED)
         agents_dec.append(dec)
 
         # define agents' actions (defect and cooperate)
-        action = agent.addAction({'verb': '', 'action': 'defect'})
-        tree = makeTree(setToConstantMatrix(dec, DEFECTED))
+        action = agent.addAction({'verb': '', 'action': 'go straight'})
+        tree = makeTree(setToConstantMatrix(dec, WENT_STRAIGHT))
         world.setDynamics(dec, action, tree)
-        action = agent.addAction({'verb': '', 'action': 'cooperate'})
-        tree = makeTree(setToConstantMatrix(dec, COOPERATED))
+        action = agent.addAction({'verb': '', 'action': 'swerve'})
+        tree = makeTree(setToConstantMatrix(dec, SWERVED))
         world.setDynamics(dec, action, tree)
 
     # defines payoff matrices
@@ -110,7 +110,7 @@ if __name__ == '__main__':
 
     for i in range(NUM_STEPS):
 
-        # decision per step (1 per agent): cooperate or defect?
+        # decision per step (1 per agent): go straight or swerve?
         logging.info('====================================')
         logging.info('Step {}'.format(i))
         step = world.step(tiebreak=TIEBREAK)

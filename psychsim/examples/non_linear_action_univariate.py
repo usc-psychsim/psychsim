@@ -1,6 +1,6 @@
 import numpy as np
 from psychsim.agent import Agent
-from psychsim.helper_functions import get_univariate_samples, tree_from_univariate_samples, get_feature_values
+from psychsim.helper_functions import get_univariate_samples, tree_from_univariate_samples
 from psychsim.pwl import makeTree
 from psychsim.world import World
 
@@ -57,7 +57,7 @@ def run_univariate_function(name, symbol_fmt, func):
         world.step()
 
         real = func(x)
-        psych = get_feature_values(world.getFeature(result))[0][0]
+        psych = world.getValue(result)
 
         print('{:3}: {:15} | Expected: {:10.3f} | PsychSim: {:10.3f}'.format(i, symbol_fmt.format(x), real, psych))
         se += (real - psych) ** 2 if not (np.isnan(real) or np.isnan(psych)) else 0
