@@ -275,7 +275,7 @@ class Agent(object):
             # Compute values in sequence
             V = {}
             for action in actions:
-                V[action] = self.value(belief,action,model,horizon,others,keySet)
+                V[action] = self.value(belief,action,model,horizon,others,keySet,selection=selection)
                 logging.debug('Evaluated %s (%d): %f' % (action,horizon,V[action]['__EV__']))
         best = None
         for action in actions:
@@ -313,7 +313,7 @@ class Agent(object):
         return result
 
     def value(self,belief,action,model,horizon=None,others=None,keySet=None,updateBeliefs=True,
-              debug={}):
+              selection=None,debug={}):
         if horizon is None:
             horizon = self.getAttribute('horizon',model)
         if keySet is None:
@@ -349,7 +349,7 @@ class Agent(object):
                     if name in start:
                         actions[name] = start[name]
                         del start[name]
-                outcome = self.world.step(actions,current,keySubset=subkeys,horizon=horizon-t,
+                outcome = self.world.step(actions,current,keySubset=subkeys,horizon=horizon-t,tiebreak=selection,
                                           updateBeliefs=updateBeliefs,debug=debug)
                 V['__ER__'].append(self.reward(current,model))
                 V['__EV__'] += V['__ER__'][-1]
