@@ -1,7 +1,6 @@
 import numpy as np
 from psychsim.action import ActionSet
 from psychsim.agent import Agent
-from psychsim.probability import Distribution
 from psychsim.pwl import KeyedMatrix, KeyedVector, makeFuture, KeyedPlane, setToConstantMatrix, rewardKey, modelKey, \
     equalRow, makeTree
 
@@ -17,12 +16,26 @@ def multi_set_matrix(key, scaled_keys):
     """
     Performs a linear combination of the given keys, i.e., scales and sums all the keys in scaled_keys dict and adds
     offset if CONSTANT in scaled_keys. If the key itself is in scaled_keys, it adds to its scaled value.
+    Sets the result to the given feature's future value.
     :param str key: the named key.
     :param dict scaled_keys: the dictionary containing the weights (scalars) for each named key.
     :rtype: KeyedMatrix
     :return: a matrix performing the given linear combination to the given key.
     """
     return KeyedMatrix({makeFuture(key): KeyedVector(scaled_keys)})
+
+
+def multi_reward_matrix(agent, scaled_keys):
+    """
+    Performs a linear combination of the given keys, i.e., scales and sums all the keys in scaled_keys dict and adds
+    offset if CONSTANT in scaled_keys. If the key itself is in scaled_keys, it adds to its scaled value.
+    Sets the result to the given agent's reward.
+    :param Agent agent: the agent to set the reward.
+    :param dict scaled_keys: the dictionary containing the weights (scalars) for each named key.
+    :rtype: KeyedMatrix
+    :return: a matrix performing the given linear combination to the given key.
+    """
+    return multi_set_matrix(rewardKey(agent.name), scaled_keys)
 
 
 def multi_compare_row(scaled_keys, threshold=0.0):

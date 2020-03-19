@@ -1,7 +1,8 @@
+from psychsim.action import ActionSet
 from psychsim.agent import Agent
-from psychsim.helper_functions import multi_set_matrix
+from psychsim.helper_functions import multi_set_matrix, get_true_model_name
 from psychsim.probability import Distribution
-from psychsim.pwl import makeTree, CONSTANT, isStateKey, setToFeatureMatrix
+from psychsim.pwl import makeTree, CONSTANT, isStateKey, setToFeatureMatrix, actionKey
 from psychsim.reward import maximizeFeature
 from psychsim.world import World
 
@@ -48,11 +49,10 @@ if __name__ == '__main__':
     # set order
     world.setOrder([agent.name])
 
-    # agent initially believes he is in pos 10, so action values will be inflated according to that
-    # agent.setBelief(pos, 10)
+    # agent has initial beliefs about its position, which will be updated after executing actions
+    agent.omega = {actionKey(agent.name)}  # todo should not need this
     agent.setBelief(pos, Distribution({10: 0.5, 12: 0.5}))
-
-    agent.omega = {var for var in world.state.keys() if not isStateKey(var)}  # or set() todo should not need this
+    # agent.setBelief(pos, 10, get_true_model_name(agent))
 
     print('====================================')
     print('Initial beliefs:')
