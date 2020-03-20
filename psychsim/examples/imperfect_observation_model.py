@@ -1,5 +1,4 @@
 import logging
-import os
 from psychsim.agent import Agent
 from psychsim.helper_functions import multi_set_matrix, multi_reward_matrix
 from psychsim.pwl import makeTree, equalRow, setToFeatureMatrix, setToConstantMatrix, thresholdRow, CONSTANT
@@ -24,7 +23,7 @@ __description__ = 'Example of setting a incorrect belief over another agent\'s f
 NUM_STEPS = 4
 HORIZON = 2
 
-LOG_FILE = 'output/imperfect_obs.log'
+DEBUG = False
 
 
 def get_fake_model_name(agent):
@@ -33,12 +32,9 @@ def get_fake_model_name(agent):
 
 if __name__ == '__main__':
 
-    # sets up log
-    out_dir = os.path.dirname(LOG_FILE)
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-    logging.basicConfig(format='[%(asctime)s %(levelname)s] %(message)s', level=logging.INFO,
-                        handlers=[logging.StreamHandler(), logging.FileHandler(LOG_FILE, 'w')])
+    # sets up log to screen
+    logging.basicConfig(format='%(message)s', level=logging.DEBUG if DEBUG else logging.INFO,
+                        handlers=[logging.StreamHandler()])
 
     # create world and add agents
     world = World()

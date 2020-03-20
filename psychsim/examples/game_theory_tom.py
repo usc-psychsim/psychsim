@@ -1,8 +1,6 @@
 import logging
-import os
 from psychsim.agent import Agent
-from psychsim.helper_functions import multi_compare_row, set_constant_reward, get_true_model_name, \
-    get_decision_info, explain_decisions
+from psychsim.helper_functions import multi_compare_row, set_constant_reward, get_true_model_name
 from psychsim.probability import Distribution
 from psychsim.pwl import makeTree, equalRow, setToConstantMatrix
 from psychsim.world import World
@@ -11,8 +9,8 @@ __author__ = 'Pedro Sequeira'
 __email__ = 'pedro.sequeira@sri.com'
 __description__ = 'Example of using theory-of-mind in a game-theory scenario involving two agents in the Chicken ' \
                   'Game (https://en.wikipedia.org/wiki/Chicken_(game)#Game_theoretic_applications). ' \
-                  'Both agents should choose the "defect" action which is rationally optimal, independently of the' \
-                  'other agent\'s action.'
+                  'Both agents should choose the "go straight" action which is rationally optimal, independently of ' \
+                  'the other agent\'s action.'
 
 NUM_STEPS = 3
 TIEBREAK = 'random'  # when values of decisions are the same, choose randomly
@@ -29,7 +27,7 @@ MUTUAL_COOP = 0  # CC
 PUNISHMENT = -1000  # DD
 INVALID = -10000
 
-LOG_FILE = 'output/gt_tom.log'
+DEBUG = False
 
 
 # defines a payoff matrix tree (0 = didn't decide, 1 = went straight, 2 = swerved)
@@ -61,12 +59,9 @@ def get_state_desc(world, dec_feature):
 
 if __name__ == '__main__':
 
-    # sets up log
-    out_dir = os.path.dirname(LOG_FILE)
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-    logging.basicConfig(format='[%(asctime)s %(levelname)s] %(message)s', level=logging.INFO,
-                        handlers=[logging.StreamHandler(), logging.FileHandler(LOG_FILE, 'w')])
+    # sets up log to screen
+    logging.basicConfig(format='%(message)s', level=logging.DEBUG if DEBUG else logging.INFO,
+                        handlers=[logging.StreamHandler()])
 
     # create world and add agent
     world = World()

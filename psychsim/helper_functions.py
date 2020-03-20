@@ -1,6 +1,7 @@
 import numpy as np
 from psychsim.action import ActionSet
 from psychsim.agent import Agent
+from psychsim.probability import Distribution
 from psychsim.pwl import KeyedMatrix, KeyedVector, makeFuture, KeyedPlane, setToConstantMatrix, rewardKey, modelKey, \
     equalRow, makeTree
 
@@ -191,11 +192,11 @@ def tree_from_univariate_samples(set_var, x_var, x_params, sample_values, idx_mi
     # builds binary search tree
     idx = (idx_max + idx_min) // 2
     x = x_params[idx]
-    return {'if': multi_compare_row({x_var: -1}, -x),  # if var is less than x
+    return {'if': multi_compare_row({x_var: 1}, x),  # if var is greater than x
             True: tree_from_univariate_samples(
-                set_var, x_var, x_params, sample_values, idx_min, idx),  # search left
+                set_var, x_var, x_params, sample_values, idx + 1, idx_max),  # search right
             False: tree_from_univariate_samples(
-                set_var, x_var, x_params, sample_values, idx + 1, idx_max)}  # search right
+                set_var, x_var, x_params, sample_values, idx_min, idx)}  # search left
 
 
 def tree_from_bivariate_samples(
@@ -249,6 +250,49 @@ def tree_from_bivariate_samples(
                 set_var, x_var, y_var, x_params, y_params, sample_values, idx_x_min, idx_x, idx_y_min, idx_y_max),
             False: tree_from_bivariate_samples(  # search right
                 set_var, x_var, y_var, x_params, y_params, sample_values, idx_x + 1, idx_x_max, idx_y_min, idx_y_max)}
+
+
+"""
+    DISCRETIZATION UTILITIES
+"""
+
+
+def discretize_feature_in_place(world, feature, num_bins):
+    """
+    Discretizes the given feature's value/distribution according to the number of intended groups in place, i.e.,
+    by directly changing its value.
+    :param World world: the PsychSim world in which the feature is defined.
+    :param str feature: the named feature to be discretized.
+    :param int num_bins: the number of discretization bins or buckets.
+    :return:
+    """
+    variable = world.variables[feature]
+    high = variable['hi']
+    low = variable['lo']
+    ran = float(high - low)
+    dist = world.getFeature(feature)
+    new_dist = Distribution()
+    for val, prob in dist.items():
+        val = int(round((float(val - low) / ran) * (num_bins-1))) * (ran / (num_bins-1)) + low
+        new_dist[val] = prob
+    world.setFeature(feature, new_dist)
+
+
+def discretization_tree(world, feature, num_bins):
+    """
+    Creates a PWL dynamics tree that discretizes the given feature according to a number of bins.
+    The discretized value corresponds to an approximation to the nearest discrete bin.
+    :param World world: the world in which the feature is defined.
+    :param str feature: the named feature to create the discretization tree.
+    :param int num_bins: the number of bins to perform the discretization.
+    :rtype: dict
+    :return: a dictionary to be used with makeTree to define the dynamics of the discretization.
+    """
+    variable = world.variables[feature]
+    high = variable['hi']
+    low = variable['lo']
+    samples = np.linspace(low, high, num_bins)
+    return tree_from_univariate_samples(feature, feature, samples, samples)
 
 
 """

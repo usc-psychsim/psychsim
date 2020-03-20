@@ -44,10 +44,9 @@ def run_univariate_function(name, symbol_fmt, func):
 
     world.setOrder([agent.name])
 
-    se = 0.0
-    max_se = 0.0
     np.random.seed(SEED)
-
+    values_original = []
+    values_approx = []
     for i in range(NUM_TEST_SAMPLES):
         # gets random sample parameter
         x = MIN_X + np.random.rand() * (MAX_X - MIN_X)
@@ -60,20 +59,14 @@ def run_univariate_function(name, symbol_fmt, func):
         psych = world.getValue(result)
 
         print('{:3}: {:15} | Expected: {:10.3f} | PsychSim: {:10.3f}'.format(i, symbol_fmt.format(x), real, psych))
-        se += (real - psych) ** 2 if not (np.isnan(real) or np.isnan(psych)) else 0
-        max_se += (real - sample_mean) ** 2 if not (np.isnan(real) or np.isnan(psych)) else 0
+        values_original.append(real)
+        values_approx.append(psych)
 
     # gets error stats
-    rmse = (se / NUM_TEST_SAMPLES) ** 0.5
-    max_rmse = (max_se / NUM_TEST_SAMPLES) ** 0.5
+    rmse = np.sqrt(np.nanmean((np.array(values_approx) - values_original) ** 2))
     print('=====================================')
     print('RMSE      = {:.3f}'.format(rmse))
-    print('RMSE_MAX  = {:.3f}'.format(max_rmse))
-    print('_____________________________________')
-    print('RMSE_NORM = {:.3f}'.format(rmse / max_rmse))
-
-    print('*************************************')
-    print('Press \'Enter\' to continue...')
+    print('\nPress \'Enter\' to continue...')
     input()
 
 
