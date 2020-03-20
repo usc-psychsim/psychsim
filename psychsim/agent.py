@@ -194,7 +194,7 @@ class Agent(object):
             myModel = keys.modelKey(self.name)
             for submodel in model.domain():
                 result[submodel] = self.decide(vector,horizon,others,submodel,
-                                               selection,actions,keySet)
+                                               selection,actions,keySet,debug)
                 if isinstance(result[submodel]['action'],Distribution):
                     matrix = {'distribution': [(setToConstantMatrix(myAction,el),
                                                 result[submodel]['action'][el]) \
@@ -268,14 +268,15 @@ class Agent(object):
         elif self.parallel:
             with multiprocessing.Pool() as pool:
                 results = [(action,pool.apply_async(self.value,
-                                                    args=(belief,action,model,horizon,others,keySet)))
+                                                    args=(belief,action,model,horizon,others,keySet,
+                                                          True,selection,debug)))
                            for action in actions]
                 V = {action: result.get() for action,result in results}
         else:
             # Compute values in sequence
             V = {}
             for action in actions:
-                V[action] = self.value(belief,action,model,horizon,others,keySet,selection=selection)
+                V[action] = self.value(belief,action,model,horizon,others,keySet,True,selection,debug)
                 logging.debug('Evaluated %s (%d): %f' % (action,horizon,V[action]['__EV__']))
         best = None
         for action in actions:
@@ -1064,7 +1065,7 @@ class Agent(object):
                 world = copy.deepcopy(beliefs)
             return world
 
-    def updateBeliefs(self,trueState,actions,horizon=None):
+    def updateBeliefs(self,trueState,actions,horizon=None,selection=None):
         """
         .. warning:: Even if this agent starts with ``True`` beliefs, its beliefs can deviate after actions with stochastic effects (i.e., the world transitions to a specific state with some probability, but the agent only knows a posterior distribution over that resulting state). If you want the agent's beliefs to stay correct, then set the ``static`` attribute on the model to ``True``.
 
@@ -1109,7 +1110,8 @@ class Agent(object):
                     # Get old belief state.
                     beliefs = copy.deepcopy(original)
                     # Project direct effect of the actions, including possible observations
-                    self.world.step(knownActions,beliefs,keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=False)
+                    self.world.step(knownActions,beliefs,keySubset=beliefs.keys(),horizon=horizon,
+                                    tiebreak=selection,updateBeliefs=False)
                     # Condition on actual observations
                     for omega in self.omega:
                         value = vector[omega]

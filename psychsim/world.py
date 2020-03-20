@@ -189,7 +189,7 @@ class World(object):
                 agent = self.agents[name]
                 if isinstance(state,VectorDistributionSet):
                     substate = state.collapse(agent.omega|{key},False)
-                delta = agent.updateBeliefs(state,joint,horizon=horizon)
+                delta = agent.updateBeliefs(state,joint,horizon=horizon,selection=tiebreak)
                 if delta:
                     if select:
                         state.distributions[substate].select(select == 'max')
