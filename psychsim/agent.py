@@ -584,7 +584,7 @@ class Agent(object):
     def findAttribute(self,name,model):
         """
         
-	:returns: the name of the nearest ancestor model (include the given model itself) that specifies a value for the named feature
+    :returns: the name of the nearest ancestor model (include the given model itself) that specifies a value for the named feature
         """
         if name in self.models[model]:
             return model
@@ -596,7 +596,7 @@ class Agent(object):
     def getAttribute(self,name,model):
         """
         
-	:returns: the value for the specified parameter of the specified mental model
+    :returns: the value for the specified parameter of the specified mental model
         """
         ancestor = self.findAttribute(name,model)
         if ancestor is None:
@@ -669,7 +669,7 @@ class Agent(object):
         :param vector: the world in which to test legality
         :param actions: the set of actions to test legality of (default is all available actions)
         
-	:returns: the set of possible actions to choose from in the given state vector
+    :returns: the set of possible actions to choose from in the given state vector
         :rtype: {L{ActionSet}}
         """
         if vector is None:
@@ -706,7 +706,7 @@ class Agent(object):
         """
         :type atom: L{Action}
         
-	:returns: ``True`` iff this agent has the given action (possibly in combination with other actions)
+    :returns: ``True`` iff this agent has the given action (possibly in combination with other actions)
         :rtype: bool
         """
         for action in self.actions:
@@ -787,7 +787,7 @@ class Agent(object):
         :param recurse: ``True`` iff it is OK to recurse into another agent's reward (default is ``True``)
         :type recurse: bool
         
-	:returns: the reward I derive in the given state (under the given model, default being the ``True`` model)
+    :returns: the reward I derive in the given state (under the given model, default being the ``True`` model)
         :rtype: float
         """
         total = 0.
@@ -876,7 +876,7 @@ class Agent(object):
         :param name: the label for this model
         :type name: sotr
         
-	:returns: the model created
+    :returns: the model created
         :rtype: dict
         """
         if name is None:
@@ -1562,7 +1562,7 @@ class ValueFunction:
     def actionTable(self,name,state,horizon):
         """
         
-	:returns: a table of values for actions for the given agent in the given state
+    :returns: a table of values for actions for the given agent in the given state
         """
         V = self.table[horizon]
         table = dict(V[state][name])
