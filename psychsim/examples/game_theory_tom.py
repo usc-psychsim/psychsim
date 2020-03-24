@@ -60,8 +60,7 @@ def get_state_desc(world, dec_feature):
 if __name__ == '__main__':
 
     # sets up log to screen
-    logging.basicConfig(format='%(message)s', level=logging.DEBUG if DEBUG else logging.INFO,
-                        handlers=[logging.StreamHandler()])
+    logging.basicConfig(format='%(message)s', level=logging.DEBUG if DEBUG else logging.INFO)
 
     # create world and add agent
     world = World()
@@ -75,6 +74,7 @@ if __name__ == '__main__':
     for agent in agents:
         # set agent's params
         agent.setAttribute('discount', 1)
+        agent.setAttribute('selection', TIEBREAK)
         agent.setHorizon(1)
         agent.setRecursiveLevel(1)
 
@@ -108,7 +108,7 @@ if __name__ == '__main__':
         # decision per step (1 per agent): go straight or swerve?
         logging.info('====================================')
         logging.info('Step {}'.format(i))
-        step = world.step(tiebreak=TIEBREAK)
+        step = world.step()
         for j in range(len(agents)):
             logging.info('{0}: {1}'.format(agents[j].name, get_state_desc(world, agents_dec[j])))
 

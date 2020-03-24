@@ -33,8 +33,7 @@ def get_fake_model_name(agent):
 if __name__ == '__main__':
 
     # sets up log to screen
-    logging.basicConfig(format='%(message)s', level=logging.DEBUG if DEBUG else logging.INFO,
-                        handlers=[logging.StreamHandler()])
+    logging.basicConfig(format='%(message)s', level=logging.DEBUG if DEBUG else logging.INFO)
 
     # create world and add agents
     world = World()

@@ -17,13 +17,15 @@ __description__ = 'Example of using theory-of-mind in a game-theory scenario inv
                   'Hence the planning horizon has an influence on the agents\' decision to cooperate or defect:' \
                   '- if horizon is 0, first action for each agent will be random (0 reward), then tit-fot-tat' \
                   '- if horizon is 1, agents will always defect (one-shot decision, other\'s action does not matter' \
-                  '- if horizon is >1, agents will always cooperate because they can see each other\'s tit-for-tat ' \
+                  '- if horizon is 2, first action for each agent will be random, because CC followed by CC = ' \
+                  'DC followed by DD = -2, so C or D have the same value independently of the other; then tit-fot-tat' \
+                  '- if horizon is >2, agents will always cooperate because they can see each other\'s tit-for-tat ' \
                   'strategy using ToM, and hence believe the other will cooperate if they also cooperate, leading to ' \
-                  'highest mutual payoff.' \
+                  'highest mutual payoff in the long run.' \
                   'Note: imperfect models can break this belief and make the agents cynical towards each other.'
 
 # parameters
-MAX_HORIZON = 3
+MAX_HORIZON = 4
 NUM_STEPS = 4
 TIEBREAK = 'random'  # when values of decisions are the same, choose randomly
 
@@ -71,8 +73,7 @@ def get_state_desc(world, dec_feature):
 if __name__ == '__main__':
 
     # sets up log to screen
-    logging.basicConfig(format='%(message)s', level=logging.DEBUG if DEBUG else logging.INFO,
-                        handlers=[logging.StreamHandler()])
+    logging.basicConfig(format='%(message)s', level=logging.DEBUG if DEBUG else logging.INFO)
 
     # create world and add agent
     world = World()
@@ -86,6 +87,7 @@ if __name__ == '__main__':
     for agent in agents:
         # set agent's params
         agent.setAttribute('discount', 1)
+        agent.setAttribute('selection', TIEBREAK)
         agent.setRecursiveLevel(1)
 
         # add "decision" variable (0 = didn't decide, 1 = Defected, 2 = Cooperated)
@@ -148,7 +150,7 @@ if __name__ == '__main__':
             # decision per step (1 per agent): cooperate or defect?
             logging.info('---------------------')
             logging.info('Step {}'.format(t))
-            step = world.step(tiebreak=TIEBREAK)
+            step = world.step()
             for i in range(len(agents)):
                 logging.info('{0}: {1}'.format(agents[i].name, get_state_desc(world, agents_dec[i])))
 

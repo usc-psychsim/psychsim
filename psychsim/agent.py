@@ -194,7 +194,7 @@ class Agent(object):
             myModel = keys.modelKey(self.name)
             for submodel in model.domain():
                 result[submodel] = self.decide(vector,horizon,others,submodel,
-                                               selection,actions,keySet,debug)
+                                               selection,actions,keySet)
                 if isinstance(result[submodel]['action'],Distribution):
                     matrix = {'distribution': [(setToConstantMatrix(myAction,el),
                                                 result[submodel]['action'][el]) \
@@ -268,15 +268,14 @@ class Agent(object):
         elif self.parallel:
             with multiprocessing.Pool() as pool:
                 results = [(action,pool.apply_async(self.value,
-                                                    args=(belief,action,model,horizon,others,keySet,
-                                                          True,selection,debug)))
+                                                    args=(belief,action,model,horizon,others,keySet)))
                            for action in actions]
                 V = {action: result.get() for action,result in results}
         else:
             # Compute values in sequence
             V = {}
             for action in actions:
-                V[action] = self.value(belief,action,model,horizon,others,keySet,True,selection,debug)
+                V[action] = self.value(belief,action,model,horizon,others,keySet)
                 logging.debug('Evaluated %s (%d): %f' % (action,horizon,V[action]['__EV__']))
         best = None
         for action in actions:
@@ -314,7 +313,7 @@ class Agent(object):
         return result
 
     def value(self,belief,action,model,horizon=None,others=None,keySet=None,updateBeliefs=True,
-              selection=None,debug={}):
+              debug={}):
         if horizon is None:
             horizon = self.getAttribute('horizon',model)
         if keySet is None:
@@ -350,7 +349,7 @@ class Agent(object):
                     if name in start:
                         actions[name] = start[name]
                         del start[name]
-                outcome = self.world.step(actions,current,keySubset=subkeys,horizon=horizon-t,tiebreak=selection,
+                outcome = self.world.step(actions,current,keySubset=subkeys,horizon=horizon-t,
                                           updateBeliefs=updateBeliefs,debug=debug)
                 V['__ER__'].append(self.reward(current,model))
                 V['__EV__'] += V['__ER__'][-1]
@@ -585,7 +584,7 @@ class Agent(object):
     def findAttribute(self,name,model):
         """
         
-	:returns: the name of the nearest ancestor model (include the given model itself) that specifies a value for the named feature
+    :returns: the name of the nearest ancestor model (include the given model itself) that specifies a value for the named feature
         """
         if name in self.models[model]:
             return model
@@ -597,7 +596,7 @@ class Agent(object):
     def getAttribute(self,name,model):
         """
         
-	:returns: the value for the specified parameter of the specified mental model
+    :returns: the value for the specified parameter of the specified mental model
         """
         ancestor = self.findAttribute(name,model)
         if ancestor is None:
@@ -670,7 +669,7 @@ class Agent(object):
         :param vector: the world in which to test legality
         :param actions: the set of actions to test legality of (default is all available actions)
         
-	:returns: the set of possible actions to choose from in the given state vector
+    :returns: the set of possible actions to choose from in the given state vector
         :rtype: {L{ActionSet}}
         """
         if vector is None:
@@ -707,7 +706,7 @@ class Agent(object):
         """
         :type atom: L{Action}
         
-	:returns: ``True`` iff this agent has the given action (possibly in combination with other actions)
+    :returns: ``True`` iff this agent has the given action (possibly in combination with other actions)
         :rtype: bool
         """
         for action in self.actions:
@@ -788,7 +787,7 @@ class Agent(object):
         :param recurse: ``True`` iff it is OK to recurse into another agent's reward (default is ``True``)
         :type recurse: bool
         
-	:returns: the reward I derive in the given state (under the given model, default being the ``True`` model)
+    :returns: the reward I derive in the given state (under the given model, default being the ``True`` model)
         :rtype: float
         """
         total = 0.
@@ -877,7 +876,7 @@ class Agent(object):
         :param name: the label for this model
         :type name: sotr
         
-	:returns: the model created
+    :returns: the model created
         :rtype: dict
         """
         if name is None:
@@ -1065,7 +1064,7 @@ class Agent(object):
                 world = copy.deepcopy(beliefs)
             return world
 
-    def updateBeliefs(self,trueState,actions,horizon=None,selection=None):
+    def updateBeliefs(self,trueState,actions,horizon=None):
         """
         .. warning:: Even if this agent starts with ``True`` beliefs, its beliefs can deviate after actions with stochastic effects (i.e., the world transitions to a specific state with some probability, but the agent only knows a posterior distribution over that resulting state). If you want the agent's beliefs to stay correct, then set the ``static`` attribute on the model to ``True``.
 
@@ -1110,8 +1109,7 @@ class Agent(object):
                     # Get old belief state.
                     beliefs = copy.deepcopy(original)
                     # Project direct effect of the actions, including possible observations
-                    self.world.step(knownActions,beliefs,keySubset=beliefs.keys(),horizon=horizon,
-                                    tiebreak=selection,updateBeliefs=False)
+                    self.world.step(knownActions,beliefs,keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=False)
                     # Condition on actual observations
                     for omega in self.omega:
                         value = vector[omega]
@@ -1564,7 +1562,7 @@ class ValueFunction:
     def actionTable(self,name,state,horizon):
         """
         
-	:returns: a table of values for actions for the given agent in the given state
+    :returns: a table of values for actions for the given agent in the given state
         """
         V = self.table[horizon]
         table = dict(V[state][name])
