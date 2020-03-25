@@ -1123,7 +1123,7 @@ class Agent(object):
                             logging.error('Beliefs:\n%s' %
                                           (beliefs.distributions[beliefs.keyMap[omega]]))
                             raise ValueError('%s has impossible observation %s=%s' % \
-                                          (self.name,omega,vector[omega]))
+                                          (self.name,omega,self.world.float2value(omega,vector[omega])))
                         beliefs[omega] = vector[omega]
                     # Create model with these new beliefs
                     # TODO: Look for matching model?
