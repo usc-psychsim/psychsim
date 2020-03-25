@@ -196,9 +196,13 @@ class Agent(object):
                 result[submodel] = self.decide(vector,horizon,others,submodel,
                                                selection,actions,keySet)
                 if isinstance(result[submodel]['action'],Distribution):
-                    matrix = {'distribution': [(setToConstantMatrix(myAction,el),
-                                                result[submodel]['action'][el]) \
-                                               for el in result[submodel]['action'].domain()]}
+                    if len(result[submodel]['action']) > 1:
+                        matrix = {'distribution': [(setToConstantMatrix(myAction,el),
+                                                    result[submodel]['action'][el]) \
+                                                   for el in result[submodel]['action'].domain()]}
+                    else:
+                        # Distribution with 100% certainty
+                        matrix = setToConstantMatrix(myAction,result[submodel]['action'].first())
                 else:
                     matrix = setToConstantMatrix(myAction,result[submodel]['action'])
                 if tree is None:
@@ -1081,9 +1085,6 @@ class Agent(object):
         for vector in list(distribution.domain()):
             oldModel = self.world.float2value(oldModelKey,vector[oldModelKey])
             original = self.getBelief(model=oldModel)
-            # These are actions I know that I've observed correctly
-            knownActions = actions.__class__({action for action in actions
-                if actionKey(action['subject']) in original and actionKey(action['subject']) in self.omega})
             # Identify label for overall observation
             label = ','.join(['%s' % (self.world.float2value(omega,vector[omega])) for omega in self.omega])
             if not oldModel in SE:
@@ -1109,7 +1110,7 @@ class Agent(object):
                     # Get old belief state.
                     beliefs = copy.deepcopy(original)
                     # Project direct effect of the actions, including possible observations
-                    self.world.step(knownActions,beliefs,keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=False)
+                    self.world.step(None,beliefs,keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=False)
                     # Condition on actual observations
                     for omega in self.omega:
                         value = vector[omega]
