@@ -237,7 +237,7 @@ class Agent(object):
             # Someone made a boo-boo because there is no legal action for this agent right now
             buf = StringIO()
             if len(self.getActions(vector)) == 0:
-                print('%s has no legal actions in:' % (self.name),file=buf)
+                print('%s [%s] has no legal actions in:' % (self.name,model),file=buf)
                 self.world.printState(vector,buf)
             else:
                 print('%s has true legal actions:' % (self.name),\
@@ -323,8 +323,10 @@ class Agent(object):
         if keySet is None:
             keySet = belief.keys()
         # Compute value across possible worlds
-        logging.debug('Considering %s' % (action))
+        logging.debug('Considering %s as %s' % (action,model))
         current = copy.deepcopy(belief)
+        if model:
+            self.world.setFeature(modelKey(self.name),model,current)
         V_A = self.getAttribute('V',model)
         if V_A:
             current *= V_A[action]
@@ -1078,11 +1080,13 @@ class Agent(object):
         # Find distribution over current belief models
         substate = trueState.keyMap[oldModelKey]
         trueState.keyMap[newModelKey] = substate
-        distribution = trueState.distributions[substate]
+        oldDist = trueState.distributions[substate]
+        newDist = oldDist.__class__()
+        trueState.distributions[substate] = newDist
         # Find action that I performed
         myAction = ActionSet({action for action in actions if action['subject'] == self.name})
         SE = {} # State estimator table
-        for vector in list(distribution.domain()):
+        for vector,prob in [(vector,oldDist[vector]) for vector in oldDist.domain()]:
             oldModel = self.world.float2value(oldModelKey,vector[oldModelKey])
             original = self.getBelief(model=oldModel)
             # Identify label for overall observation
@@ -1110,7 +1114,8 @@ class Agent(object):
                     # Get old belief state.
                     beliefs = copy.deepcopy(original)
                     # Project direct effect of the actions, including possible observations
-                    self.world.step(None,beliefs,keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=False)
+                    outcome = self.world.step({self.name: myAction} if myAction else None,beliefs,
+                        keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=False)
                     # Condition on actual observations
                     for omega in self.omega:
                         value = vector[omega]
@@ -1120,37 +1125,43 @@ class Agent(object):
                             if b[omega] == value:
                                 break
                         else:
-                            logging.error('Beliefs:\n%s' %
-                                          (beliefs.distributions[beliefs.keyMap[omega]]))
-                            raise ValueError('%s has impossible observation %s=%s' % \
-                                          (self.name,omega,self.world.float2value(omega,vector[omega])))
+                            logging.warning('%s (model %s) has impossible observation %s=%s when doing %s' % \
+                                          (self.name,oldModel,omega,self.world.float2value(omega,vector[omega]),myAction))
+                            SE[oldModel][label] = None
+                            break
                         beliefs[omega] = vector[omega]
-                    # Create model with these new beliefs
-                    # TODO: Look for matching model?
-                    for dist in beliefs.distributions.values():
-                        if len(dist) > 1:
-                            deletion = False
-                            for vec in dist.domain():
-                                if dist[vec] < self.epsilon:
-                                    del dist[vec]
-                                    deletion = True
-                            if deletion:
-                                dist.normalize()
-                    newModel = self.belief2model(oldModel,beliefs)
-                    SE[oldModel][label] = newModel['index']
-#                    if oldModelKey in beliefs:
-                        # Update the model value in my beliefs? I don't think so, but maybe there's a reason to?
-#                        beliefs.join(oldModelKey,newModel['index'])
-                    self.models[oldModel]['SE'][myAction][label] = newModel['name']
-            # Insert new model into true state
-            prob = distribution[vector]
-            del distribution[vector]
-            if isinstance(SE[oldModel][label],int) or isinstance(SE[oldModel][label],float):
-                vector[newModelKey] = SE[oldModel][label]
-            else:
-                raise RuntimeError('Unable to process stochastic belief updates:%s' \
-                    % (SE[oldModel][olabel]))
-            distribution.addProb(vector,prob)
+                    else:
+                        # Create model with these new beliefs
+                        # TODO: Look for matching model?
+                        for dist in beliefs.distributions.values():
+                            if len(dist) > 1:
+                                deletion = False
+                                for vec in dist.domain():
+                                    if dist[vec] < self.epsilon:
+                                        del dist[vec]
+                                        deletion = True
+                                if deletion:
+                                    dist.normalize()
+                        newModel = self.belief2model(oldModel,beliefs)
+                        SE[oldModel][label] = newModel['index']
+    #                    if oldModelKey in beliefs:
+                            # Update the model value in my beliefs? I don't think so, but maybe there's a reason to?
+    #                        beliefs.join(oldModelKey,newModel['index'])
+                        self.models[oldModel]['SE'][myAction][label] = newModel['name']
+            if SE[oldModel][label] is not None:
+                # Insert new model into true state
+                if isinstance(SE[oldModel][label],int) or isinstance(SE[oldModel][label],float):
+                    vector[newModelKey] = SE[oldModel][label]
+                else:
+                    raise RuntimeError('Unable to process stochastic belief updates:%s' \
+                        % (SE[oldModel][olabel]))
+                newDist.addProb(vector,prob)
+        newDist.normalize()
+#        assert len(newDist) > 0
+#        for vector in newDist.domain():
+#            assert newModelKey in vector
+#            newModel = self.world.float2value(modelKey(self.name),vector[newModelKey])
+#            newBelief = self.getBelief(model=newModel)
         return SE
     
     def stateEstimator(self,oldReal,newReal,omega,model=True):
