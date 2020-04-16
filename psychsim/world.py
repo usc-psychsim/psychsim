@@ -1669,6 +1669,9 @@ class World(object):
                         self.explainDecision(outcome['decisions'][name],buf,level)
 
     def explainAction(self,state=None,agents=None,buf=None,level=1):
+        """
+        :param agents: subset of agents whose actions will be extracted (default is all acting agents)
+        """
         if state is None:
             state = self.state
         joint = {}
