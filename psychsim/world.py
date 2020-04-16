@@ -1728,7 +1728,7 @@ class World(object):
             print('%s = %s' % (modelKey(name),model))
             self.printState(b,buf,prefix,beliefs)
 
-    def printState(self,distribution=None,buf=None,prefix='',beliefs=True):
+    def printState(self,distribution=None,buf=None,prefix='',beliefs=True,first=True,models=None):
         """
         Utility method for displaying a distribution over possible worlds
         :type distribution: L{VectorDistribution}
@@ -1760,20 +1760,20 @@ class World(object):
                     certain.update(distribution.distributions[substate].first())
                 else:
                     remaining.append(substate)
-            self.printVector(certain,buf,prefix,beliefs)
+            self.printVector(certain,buf,prefix,first,beliefs,models=models)
             for label in remaining:
                 subdistribution = distribution.distributions[label]
                 if not label is None:
                     print('-------------------',file=buf)
-                self.printState(subdistribution,buf,prefix,beliefs)
+                self.printState(subdistribution,buf,prefix,beliefs,first,models)
         elif isinstance(distribution,KeyedVector):
-            self.printVector(distribution,buf,prefix,beliefs)
+            self.printVector(distribution,buf,prefix,beliefs,models=models)
         else:
             for vector in distribution.domain():
                 print('%s%d%%' % (prefix,distribution[vector]*100.),file=buf)
-                self.printVector(vector,buf,prefix,beliefs=beliefs)
+                self.printVector(vector,buf,prefix,beliefs=beliefs,models=models)
 
-    def printVector(self,vector,buf=None,prefix='',first=True,beliefs=False,csv=False):
+    def printVector(self,vector,buf=None,prefix='',first=True,beliefs=False,csv=False,models=None):
         """
         Utility method for displaying a single possible world
         :type vector: L{psychsim.pwl.KeyedVector}
@@ -1787,6 +1787,8 @@ class World(object):
         :param beliefs: if C{True}, then print any agent beliefs that might deviate from this vector as well (default is C{False})
         :type beliefs: bool
         """
+        if models is None:
+            models = set()
         if csv:
             if prefix:
                 elements = [prefix]
@@ -1882,12 +1884,12 @@ class World(object):
                             first = False
                         else:
                             print('%s\t%-12s' % (prefix,label),file=buf)
-                        self.agents[entity].printModel(index=vector[key],prefix=prefix)
+                        self.agents[entity].printModel(index=vector[key],prefix=prefix,previous=models)
                         change = True
                         newEntity = False
                     else:
                         print('\t%12s' % (''),file=buf)
-                        self.agents[entity].printModel(index=vector[key],prefix=prefix)
+                        self.agents[entity].printModel(index=vector[key],prefix=prefix,previous=models)
                     newEntity = False
 #        if not csv and not change:
 #            print('%s\tUnchanged' % (prefix),file=buf)
