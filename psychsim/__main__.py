@@ -7,7 +7,7 @@ from pwl.keys import WORLD
 from ui.mainwindow import Ui_MainWindow
 from ui.worldview import WorldView
 from ui.mapview import MapView
-from world import World
+from world import World,loadWorld
 
 settings = QSettings('USC ICT','PsychSim')
 
@@ -27,19 +27,16 @@ class PsychSimUI(QMainWindow, Ui_MainWindow):
             self.openScenario(str(filename))
 
     def openScenario(self,filename):
-        if os.path.splitext(filename)[1] == '.pkl':
-            with open(filename,'rb') as f:
-                try:
-                    self.world = pickle.load(f)
-                except ValueError:
-                    msg = QMessageBox()
-                    msg.setIcon(QMessageBox.Warning)
-                    msg.setText('Scenario file saved under different version of Python')
-                    msg.setInformativeText(filename)
-                    msg.setWindowTitle('Unable to open scenario')
-                    msg.setStandardButtons(QMessageBox.Ok)
-                    msg.exec_()
-                    return
+        if os.path.splitext(filename)[1] == '.psy':
+            self.world = loadWorld(filename)
+#                    msg = QMessageBox()
+#                    msg.setIcon(QMessageBox.Warning)
+#                    msg.setText('Scenario file saved under different version of Python')
+#                    msg.setInformativeText(filename)
+#                    msg.setWindowTitle('Unable to open scenario')
+#                    msg.setStandardButtons(QMessageBox.Ok)
+#                    msg.exec_()
+#                    return
         else:
             self.world = World(filename)
         self.scene.world = self.world
