@@ -5,6 +5,7 @@ import logging
 import inspect
 import multiprocessing
 import os
+import pickle
 import time
 from xml.dom.minidom import Document,Node,parseString
 
@@ -2204,25 +2205,15 @@ class World(object):
                 assert Agent.isXML(node)
                 self.addAgent(Agent(node),False)
         
-    def save(self,filename,compressed=True):
+    def save(self,filename):
         """
-        :param compressed: if C{True}, then save in compressed XML; otherwise, save in XML (default is C{True})
-        :type compressed: bool
         :returns: the filename used (possibly with a .psy extension added)
         :rtype: str
         """
-        if compressed:
-            if filename[-4:] != '.psy':
-                filename = '%s.psy' % (filename)
-        elif filename[-4:] != '.xml':
-            filename = '%s.xml' % (filename)
-        if compressed:
-            f = bz2.BZ2File(filename,'w')
-            f.write(self.__xml__().toprettyxml().encode('utf-8'))
-        else:
-            f = open(filename,'w')
-            f.write(self.__xml__().toprettyxml())
-        f.close()
+        if filename[-4:] != '.psy':
+            filename = '%s.psy' % (filename)
+        with bz2.BZ2File(filename,'w') as f:
+            pickle.dump(self,f)
         return filename
 
 def parseDomain(subnode):
@@ -2286,3 +2277,9 @@ def scaleValue(value,entry):
         return float(value)/float(len(entry['elements']))
     else:
         return value
+
+def loadWorld(filename):
+    if filename[-4:] != '.psy':
+        filename = '%s.psy' % (filename)
+    f = bz2.BZ2File(filename,'rb')
+    return pickle.load(f)
