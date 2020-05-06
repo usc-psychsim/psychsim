@@ -987,7 +987,7 @@ class Agent(object):
                 index += 1
             return self.addModel('%s%d' % (parent['name'],index),beliefs=belief,parent=parent['name'])
 
-    def printModel(self,model=True,buf=None,index=None,prefix='',previous=None):
+    def printModel(self,model=None,buf=None,index=None,prefix='',reward=False,previous=None):
         if isinstance(index,int) or isinstance(index,float):
             model = self.index2model(index)
         if model is None:
@@ -998,7 +998,7 @@ class Agent(object):
             # Have not printed out this model before
             if isinstance(previous,set):
                 previous.add(model['name'])
-            if 'R' in model and not model['R'] is True:
+            if reward and 'R' in model and not model['R'] is True:
                 self.printReward(model['name'],buf,'%s\t\t' % (prefix))
             if 'beliefs' in model and not model['beliefs'] is True:
                 print('%s\t\t\t----beliefs:----' % (prefix),file=buf)
@@ -1125,10 +1125,13 @@ class Agent(object):
                             if b[omega] == value:
                                 break
                         else:
-                            logging.warning('%s (model %s) has impossible observation %s=%s when doing %s' % \
-                                          (self.name,oldModel,omega,self.world.float2value(omega,vector[omega]),myAction))
-                            SE[oldModel][label] = None
-                            break
+                            if omega == oldModelKey:
+                                continue
+                            else:
+                                logging.warning('%s (model %s) has impossible observation %s=%s when doing %s' % \
+                                              (self.name,oldModel,omega,self.world.float2value(omega,vector[omega]),myAction))
+                                SE[oldModel][label] = None
+                                break
                         beliefs[omega] = vector[omega]
                     else:
                         # Create model with these new beliefs
@@ -1144,6 +1147,9 @@ class Agent(object):
                                     dist.normalize()
                         newModel = self.belief2model(oldModel,beliefs)
                         SE[oldModel][label] = newModel['index']
+                        if oldModelKey in self.omega:
+                            # Observe this new model
+                            beliefs.join(oldModelKey,newModel['index'])
     #                    if oldModelKey in beliefs:
                             # Update the model value in my beliefs? I don't think so, but maybe there's a reason to?
     #                        beliefs.join(oldModelKey,newModel['index'])

@@ -1724,10 +1724,11 @@ class World(object):
                             nodes.insert(index,node['projection'][index])
 
     def printBeliefs(self,name,state=None,buf=None,prefix='',beliefs=True):
-        table = self.agents[name].getBelief(state)
-        for model,b in table.items():
-            print('%s = %s' % (modelKey(name),model))
-            self.printState(b,buf,prefix,beliefs)
+        models = self.getModel(name,state)
+        previous = set()
+        for model in models.domain():
+            print('%s = %s (%d%%)' % (modelKey(name),model,models[model]*100))
+            self.agents[name].printModel(model,buf,prefix=prefix,previous=previous)
 
     def printState(self,distribution=None,buf=None,prefix='',beliefs=True,first=True,models=None):
         """
