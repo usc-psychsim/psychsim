@@ -373,6 +373,17 @@ class VectorDistribution(Distribution):
         else:
             return Distribution.select(self,maximize)
             
+    def deleteKey(self,key):
+        """
+        Removes the specified column from all vectors in this distribution
+        :type key: str
+        """
+        vectors = [(vec,self[vec]) for vec in self.domain()]
+        self.clear()
+        for vec,prob in vectors:
+            del vec[key]
+            self.addProb(vec,prob)
+            
     def hasColumn(self,key):
         """
         :return: C{True} iff the given key appears in all of the vectors of this distribution
