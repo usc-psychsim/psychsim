@@ -716,7 +716,7 @@ class World(object):
         keysIn = tree.getKeysIn()
         keysOut = tree.getKeysOut()
     
-    def setDynamics(self,key,action,tree,enforceMin=False,enforceMax=False,codePtr=False):
+    def setDynamics(self,key,action,tree,enforceMin=False,enforceMax=False,codePtr=True):
         """
         Defines the effect of an action on a given state feature
         :param key: the key of the affected state feature
@@ -750,8 +750,8 @@ class World(object):
             self.dynamics[key] = {}
         if action not in self.dynamics:
             self.dynamics[action] = {}
-        if action is not True and len(action) == 1 and next(iter(action)) not in self.dynamics:
-            self.dynamics[next(iter(action))] = {}
+#        if action is not True and len(action) == 1 and next(iter(action)) not in self.dynamics:
+#            self.dynamics[next(iter(action))] = {}
         # Translate symbolic names into numeric values
         tree = tree.desymbolize(self.symbols)
         if enforceMin and self.variables[key]['domain'] in [int,float]:
@@ -762,8 +762,8 @@ class World(object):
             tree.ceil(key,self.variables[key]['hi'])
         self.dynamics[key][action] = tree
         self.dynamics[action][key] = tree
-        if action is not True and len(action) == 1:
-            self.dynamics[next(iter(action))][key] = tree
+#        if action is not True and len(action) == 1:
+#            self.dynamics[next(iter(action))][key] = tree
         if codePtr:
             frame = inspect.getouterframes(inspect.currentframe())[1]
             try:
@@ -1062,7 +1062,7 @@ class World(object):
     """-------------"""
 
     def defineVariable(self,key,domain=float,lo=0.,hi=1.,description=None,
-                       combinator=None,substate=None,codePtr=False):
+                       combinator=None,substate=None,codePtr=True):
         """
         Define the type and domain of a given element of the state vector
 
@@ -1308,7 +1308,7 @@ class World(object):
         raise DeprecationWarning('Use float2value method instead')
 
     def defineState(self,entity,feature,domain=float,lo=0.,hi=1.,description=None,combinator=None,
-                    substate=None,codePtr=False):
+                    substate=None,codePtr=True):
         """
         Defines a state feature associated with a single agent, or with the global world state.
         :param entity: if C{None}, the given feature is on the global world state; otherwise, it is local to the named agent

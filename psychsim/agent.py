@@ -614,7 +614,7 @@ class Agent(object):
     """Action methods"""
     """------------------"""
 
-    def addAction(self,action,condition=None,description=None,codePtr=False):
+    def addAction(self,action,condition=None,description=None,codePtr=True):
         """
         :param condition: optional legality condition
         :type condition: L{KeyedPlane}
