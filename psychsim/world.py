@@ -1195,16 +1195,29 @@ class World(object):
             state = self.state
         for key in keys:
             if key in state:
-                raise ValueError('Unable to add joint distribution over features already present in state')
-        hi = max(state.distributions.keys())
+                sub = state.distributions[state.keyMap[key]]
+                if len(sub) == 1:
+                    # Certain
+                    sub.deleteKey(key)
+                    if len(sub.keys()) <= 1:
+                        # Empty
+                        del state.distributions[state.keyMap[key]]
+                    del state.keyMap[key]
+                else:
+                    raise ValueError('Unable to extricate pre-existing distribution for %s' % (key))
+        substate = 0
+        while substate in state.distributions:
+            substate += 1
         for key in keys:
             if key != CONSTANT:
-                state.keyMap[key] = hi+1
-        value = copy.deepcopy(distribution)
+                state.keyMap[key] = substate
+        value = distribution.__class__()
+        for vec in distribution.domain():
+            value[vec.__class__({key: self.value2float(key,vec[key]) for key in vec})] = distribution[vec]
         if CONSTANT not in keys:
             value.join(CONSTANT,1.)
-        state.distributions[hi+1] = value
-        return hi+1
+        state.distributions[substate] = value
+        return substate
 
     def encodeVariable(self,key,value):
         raise DeprecationWarning('Use value2float method instead')
