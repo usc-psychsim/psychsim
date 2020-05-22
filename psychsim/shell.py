@@ -1,22 +1,19 @@
 from argparse import ArgumentParser
 import sys
 
-from psychsim.world import World
+from psychsim.world import loadWorld
 
 def printHelp():
-    keys = commands.keys()
-    keys.sort()
-    for cmd in keys:
+    for cmd in sorted(commands.keys()):
         print('%s\t%s' % (cmd,commands[cmd]['help']))
 
 def loadScenario(filename):
     global world
-    world = World(filename)
+    world = loadWorld(filename)
 
 def step(actions=None):
-    outcome = world.step(actions)
-    world.explain(outcome,args['debug'])
-    world.state.select()
+    outcome = world.step(actions,select=True)
+    world.explainAction(outcome,args['debug'])
 
 def act(label):
     assert len(world.state) == 1,'Unable to work with uncertain state'
@@ -70,7 +67,7 @@ if __name__ == '__main__':
     else:
         loadScenario(args['scenario'])
 
-    commands = {'quit': {'function': sys.exit,
+    commands = {'quit': {'function': exit,
                          'args': [],'state': False,'world': False,
                          'help': 'Exit the shell'},
                 'help': {'function': printHelp,
@@ -93,13 +90,11 @@ if __name__ == '__main__':
         prompt = '> '
         if world:
             prompt = '%s%s' % (','.join(world.next()),prompt)
-        print(prompt,)
-        line = stream.readline().strip()
-        print()
+        line = input(prompt)
         elements = line.split()
         if elements:
             cmd = elements[0]
-            if commands.has_key(cmd):
+            if cmd in commands:
                 if len(commands[cmd]['args']) == 1:
                     params = (' '.join(elements[1:]),)
                 else:
@@ -109,12 +104,9 @@ if __name__ == '__main__':
                 elif commands[cmd]['world'] and world is None:
                     print('Must load scenario before performing command "%s"' % (cmd))
                 else:
-                    try:
-                        apply(commands[cmd]['function'],params)
-                        if commands[cmd]['state']:
-                            world.printState()
-                    except AssertionError(msg):
-                        print('Error: %s' % (msg))
+                    commands[cmd]['function'](*params)
+                    if commands[cmd]['state']:
+                        world.printState()
             else:
                 print('Unknown command: "%s"' % (cmd))
                 print(elements)
