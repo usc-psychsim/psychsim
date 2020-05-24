@@ -461,7 +461,7 @@ class World(object):
                         if isinstance(tree,KeyedMatrix):
                             state *= tree
                         else:
-                            raise TypeError('Unable to generate selective effect from:\n%s' (tree))
+                            raise TypeError('Unable to generate selective effect from:\n%s' % (tree))
                 else:
                     state *= tree
             if select and isinstance(state,VectorDistributionSet):
@@ -1156,7 +1156,7 @@ class World(object):
             except AttributeError:
                 self.extras[key] = '%s:%d' % (mod,frame[2])
 
-    def setFeature(self,key,value,state=None):
+    def setFeature(self,key,value,state=None,noclobber=True):
         """
         Set the value of an individual element of the state vector
         :param key: the label of the element to set
@@ -1175,7 +1175,16 @@ class World(object):
         if state is None:
             state = self.state
         if isinstance(state,VectorDistributionSet):
-            state.join(key,self.value2float(key,value),self.variables[key]['substate'])
+            if noclobber and key in state.keys() and len(state.subDistribution(key).keys()) > 2:
+                # Posterior update using existing distribution
+                if isinstance(value,Distribution):
+                    raise TypeError('Unable to set posterior distribution on %s within joint distribution over %s' % 
+                        (key,', '.join(sorted({key for key in state.subDistribution(key).keys() if key != CONSTANT}))))
+                else:
+                    state[key] = self.value2float(key,value)
+            else:
+                # Set new value for this feature
+                state.join(key,self.value2float(key,value),self.variables[key]['substate'])
         else:
             assert not isinstance(value,Distribution)
             state[key] = self.value2float(key,value)
