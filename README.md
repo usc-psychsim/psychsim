@@ -1,6 +1,9 @@
 # atomic
 Agents with Theory Of Mind for Intelligent Collaboration
 
+# Documentation
+The latests documentation can be found [here][3].
+
 # Installation/Development
 In order to install the module for development (see pip [docs][1]):
 
@@ -17,3 +20,4 @@ To install from a `requrements.txt` (i.e. as part of an automated docker build) 
 
 [1]: https://pip.pypa.io/en/stable/reference/pip_install/#editable-installs
 [2]: https://stackoverflow.com/questions/16584552/how-to-state-in-requirements-txt-a-direct-github-source
+[3]: https://psychsim.readthedocs.io/en/latest/
