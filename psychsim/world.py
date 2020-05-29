@@ -838,13 +838,14 @@ class World(object):
                         self.dynamics[atom] = {}
                     self.dynamics[atom][key] = dynamics
 
-    def getActionEffects(self,actions,keySubset,uncertain=False):
+    def getActionEffects(self,actions,keySubset,uncertain=False,dynamics=None):
         """
         :param uncertain: True iff there is uncertainty about which actions will be performed
         """
-        dynamics = {}
-        for action in actions:
-            for key,tree in self.dynamics.get(action,{}).items():
+        if dynamics is None:
+            dynamics = {}
+        if actions in self.dynamics:
+            for key,tree in self.dynamics[actions].items():
                 if key in keySubset:
                     if uncertain:
                         tree = self.getConditionalDynamics(action,key,tree)
@@ -852,6 +853,10 @@ class World(object):
                         dynamics[key].append(tree)
                     except KeyError:
                         dynamics[key] = [tree]
+        elif len(actions) > 1:
+            for action in actions:
+                self.getActionEffects(ActionSet(action),keySubset,uncertain,dynamics)
+        # Look for "universal" dynamics for any state feature with no other dynamics
         for key,tree in self.dynamics.get(True,{}).items():
             if key in keySubset and key not in dynamics:
                 dynamics[key] = [tree]
