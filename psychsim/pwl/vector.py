@@ -300,7 +300,7 @@ class VectorDistribution(Distribution):
                     self.addProb(new,prob*value[element])
             else:
                 row[key] = value
-                self[row] = prob
+                self.addProb(row,prob)
 
 
     def merge(self,other,inPlace=False):
