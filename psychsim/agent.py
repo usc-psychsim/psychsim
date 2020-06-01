@@ -736,22 +736,24 @@ class Agent(object):
     """Reward methods"""
     """------------------"""
 
-    def setReward(self,tree,weight=0.,model=True):
+    def setReward(self,tree,weight=0.,model=None):
         """
         Adds/updates a goal weight within the reward function for the specified model.
         """
-        if not model in self.models:
-            model = '%s0' % (self.name)
-        if self.models[model].get('R',None) is None:
-            self.models[model]['R'] = {}
-        if not isinstance(tree,str):
-            tree = tree.desymbolize(self.world.symbols)
-        self.models[model]['R'][tree] = weight
-        key = rewardKey(self.name)
-        if not key in self.world.variables:
-            self.world.defineVariable(key,float,
-                                      description='Reward for %s in this state' % (self.name))
-            self.world.setFeature(key,0.)
+        if model is None:
+            for model in self.world.getModel(self.name,self.world.state).domain():
+                self.setReward(tree,weight,model)
+        else:
+            if self.models[model].get('R',None) is None:
+                self.models[model]['R'] = {}
+            if not isinstance(tree,str):
+                tree = tree.desymbolize(self.world.symbols)
+            self.models[model]['R'][tree] = weight
+            key = rewardKey(self.name)
+            if not key in self.world.variables:
+                self.world.defineVariable(key,float,
+                                          description='Reward for %s in this state' % (self.name))
+                self.world.setFeature(key,0.)
 
     def getReward(self,model=None):
         if model is None:
