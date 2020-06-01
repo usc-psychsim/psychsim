@@ -44,9 +44,10 @@ class KeyedTree:
         self.branch = plane
         self.leaf = False
 
-    def makeProbabilistic(self,distribution):
+    def makeProbabilistic(self,distribution,force=False):
         assert isinstance(distribution,Distribution)
-        assert len(distribution) > 1
+        if not force:
+            assert len(distribution) > 1,'Creating a probabilistic branch with a 100% distribution. Use force=True if this is really what you want to do'
         self.children = distribution
         self.branch = None
         self.leaf = False
