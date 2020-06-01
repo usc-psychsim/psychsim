@@ -1,10 +1,10 @@
-import collections
+import collections.abc
 from xml.dom.minidom import Document,Node
 
 from psychsim.probability import Distribution
 from . import keys
 
-class KeyedVector(collections.MutableMapping):
+class KeyedVector(collections.abc.MutableMapping):
     """
     Class for a compact, string-indexable vector
     :cvar epsilon: the margin used for equality of vectors (as well as for testing hyperplanes in L{KeyedPlane})
@@ -15,7 +15,7 @@ class KeyedVector(collections.MutableMapping):
     epsilon = 1e-8
 
     def __init__(self,arg={}):
-        collections.MutableMapping.__init__(self)
+        collections.abc.MutableMapping.__init__(self)
         self._data = {}
         self._string = None
         if isinstance(arg,Node):
