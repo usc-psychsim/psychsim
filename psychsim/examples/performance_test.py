@@ -10,7 +10,7 @@ from psychsim.reward import maximizeFeature
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
-__email__ = 'pedro.sequeira@sri.com'
+__email__ = 'pedrodbs@gmail.com'
 __description__ = 'This script allows test profiling PsychSim. We can define the number of agents simulated, the number' \
                   'of actions available, planning horizon, etc. If we plug in the "vprof" profiler then we can check ' \
                   'the portions of the code contributing the most to CPU time and memory.'

@@ -4,7 +4,7 @@ from psychsim.helper_functions import discretize_feature_in_place
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
-__email__ = 'pedro.sequeira@sri.com'
+__email__ = 'pedrodbs@gmail.com'
 __description__ = 'Example of how to discretize a feature\'s value in-place using a helper function. ' \
                   'Discretization occurs by directly approximating the value of the feature to the closest bin from ' \
                   'a discrete set of bins.' \

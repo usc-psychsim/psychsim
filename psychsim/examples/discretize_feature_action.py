@@ -5,7 +5,7 @@ from psychsim.pwl import makeTree
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
-__email__ = 'pedro.sequeira@sri.com'
+__email__ = 'pedrodbs@gmail.com'
 __description__ = 'Example of how to discretize a feature\'s value with an action using a helper function. ' \
                   'Discretization occurs by having an action whose PWL dynamics approximate the value of the feature ' \
                   'to the closest bin from a discrete set of bins by performing a binary search.' \

@@ -6,7 +6,7 @@ from psychsim.helper_functions import multi_compare_row, set_constant_reward, se
     get_true_model_name
 
 __author__ = 'Pedro Sequeira'
-__email__ = 'pedro.sequeira@sri.com'
+__email__ = 'pedrodbs@gmail.com'
 __description__ = 'Example of how to set legality for agent\'s models in PsychSim using the helper functions. ' \
                   'There are two agents how have two actions: go left or go right. If the agents choose the same ' \
                   'action, they both receive a penalty, if they go to different directions they both receive a ' \

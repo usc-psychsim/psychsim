@@ -1,3 +1,4 @@
+import random
 import numpy as np
 from psychsim.action import ActionSet
 from psychsim.agent import Agent
@@ -6,7 +7,9 @@ from psychsim.pwl import KeyedMatrix, KeyedVector, makeFuture, KeyedPlane, setTo
     equalRow, makeTree
 
 __author__ = 'Pedro Sequeira, Stacy Marsella'
-__email__ = 'pedro.sequeira@sri.com'
+__email__ = 'pedrodbs@gmail.com'
+
+from psychsim.world import World
 
 """
     PWL UTILITIES
@@ -126,6 +129,31 @@ def get_true_model_name(agent):
     :return: the name of true model of the given agent.
     """
     return '{}0'.format(agent.name)
+
+
+def get_random_value(world, feature, rng=None):
+    """
+    Gets a random value for a given feature according to its domain.
+    :param World world: the PsychSim world in which the feature is defined.
+    :param str feature: the named feature.
+    :param random.Random rng: the random state used to sample values.
+    :return: a random value according to the feature's domain.
+    """
+    assert feature in world.variables, 'World does not contain feature \'{}\''.format(feature)
+
+    var = world.variables[feature]
+    domain = var['domain']
+    rng = random.Random() if rng is None else rng
+
+    if domain is float:
+        return rng.uniform(var['lo'], var['hi'])
+    if domain is int:
+        return rng.randint(var['lo'], var['hi'])
+    if domain is list or domain is set:
+        return rng.choice(var['elements'])
+    if domain is bool:
+        return bool(rng.randint(0, 2))
+    return None
 
 
 """
@@ -273,7 +301,7 @@ def discretize_feature_in_place(world, feature, num_bins):
     dist = world.getFeature(feature)
     new_dist = Distribution()
     for val, prob in dist.items():
-        val = int(round((float(val - low) / ran) * (num_bins-1))) * (ran / (num_bins-1)) + low
+        val = int(round((float(val - low) / ran) * (num_bins - 1))) * (ran / (num_bins - 1)) + low
         new_dist[val] = prob
     world.setFeature(feature, new_dist)
 
