@@ -5,7 +5,7 @@ from psychsim.pwl import makeTree, equalRow, setToFeatureMatrix, setToConstantMa
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
-__email__ = 'pedro.sequeira@sri.com'
+__email__ = 'pedrodbs@gmail.com'
 __description__ = 'Example of setting a incorrect belief over another agent\'s feature. Two agents interact with each ' \
                   'other: a a consumer agent asks for a certain amount of product while a producer agent produces ' \
                   'that product. The produced amount depends on the producer\'s production capacity and the asked ' \

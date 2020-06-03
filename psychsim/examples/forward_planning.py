@@ -5,7 +5,7 @@ from psychsim.pwl import makeTree, setToFeatureMatrix
 from psychsim.reward import achieveFeatureValue, CONSTANT
 
 __author__ = 'Pedro Sequeira'
-__email__ = 'pedro.sequeira@sri.com'
+__email__ = 'pedrodbs@gmail.com'
 __description__ = 'Simple forward planning (discounted) example involving a single decision and variable rewards.' \
                   'Agent will prefer to go left unless it can plan 3+ steps into the future, in which case ' \
                   'it "sees" it\'s best to go right to later achieve a higher reward.'

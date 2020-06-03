@@ -6,7 +6,7 @@ from psychsim.pwl import makeTree, equalRow, setToConstantMatrix
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
-__email__ = 'pedro.sequeira@sri.com'
+__email__ = 'pedrodbs@gmail.com'
 __description__ = 'Example of using theory-of-mind in a game-theory scenario involving two agents in the iterated' \
                   'version of the Prisoner\'s dilemma ' \
                   '(https://en.wikipedia.org/wiki/Prisoner%27s_dilemma#The_iterated_prisoner%27s_dilemma)' \

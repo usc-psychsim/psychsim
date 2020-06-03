@@ -5,7 +5,7 @@ from psychsim.pwl import makeTree
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
-__email__ = 'pedro.sequeira@sri.com'
+__email__ = 'pedrodbs@gmail.com'
 __description__ = 'An example of how to use the helper functions to create non-linear action dynamics in PsychSim.' \
                   'The input is a non-linear univariate function, and the helper functions automatically generate' \
                   'a binary search tree that approximates the function.' \

@@ -4,7 +4,7 @@ from psychsim.pwl import makeTree, CONSTANT, setToFeatureMatrix
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
-__email__ = 'pedro.sequeira@sri.com'
+__email__ = 'pedrodbs@gmail.com'
 __description__ = 'Example of the effect of turn order. There are two agents, one has a \'copy\' action which ' \
                   'simply copies a variable\'s value to another variable, and another agent that has an ' \
                   '\'increment\' action that adds 1 to the variables\'s current value. Different orders between the' \

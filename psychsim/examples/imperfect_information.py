@@ -7,7 +7,7 @@ from psychsim.reward import maximizeFeature
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
-__email__ = 'pedro.sequeira@sri.com'
+__email__ = 'pedrodbs@gmail.com'
 __description__ = 'Example that models one agent navigating left or right along one dimension (one position feature). ' \
                   'We set a belief to the agent for an incorrect position, and see the agent act based on that belief, ' \
                   'i.e., in its mind the position is changing, but is not aligned with the real/true position.'
