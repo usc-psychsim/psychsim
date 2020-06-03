@@ -848,7 +848,7 @@ class World(object):
             for key,tree in self.dynamics[actions].items():
                 if key in keySubset:
                     if uncertain:
-                        tree = self.getConditionalDynamics(action,key,tree)
+                        tree = self.getConditionalDynamics(actions,key,tree)
                     try:
                         dynamics[key].append(tree)
                     except KeyError:
