@@ -1099,11 +1099,6 @@ class World(object):
             raise NameError('Variable %s already defined' % (key))
         if key[-1] == "'":
             raise ValueError('Ending single-quote reserved for indicating future state')
-        if substate is None and isinstance(self.state,VectorDistributionSet):
-            try:
-                substate = max(self.state.distributions.keys())+1
-            except ValueError:
-                substate = 0
         self.variables[key] = {'domain': domain,
                                'description': description,
                                'substate': substate,
@@ -1161,7 +1156,7 @@ class World(object):
             except AttributeError:
                 self.extras[key] = '%s:%d' % (mod,frame[2])
 
-    def setFeature(self,key,value,state=None,noclobber=True):
+    def setFeature(self,key,value,state=None,noclobber=False):
         """
         Set the value of an individual element of the state vector
         :param key: the label of the element to set
@@ -1189,7 +1184,14 @@ class World(object):
                     state[key] = self.value2float(key,value)
             else:
                 # Set new value for this feature
-                state.join(key,self.value2float(key,value),self.variables[key]['substate'])
+                substate = self.variables[key]['substate']
+                if substate is None:
+                    try:
+                        substate = max(state.distributions.keys())+1
+                    except ValueError:
+                        substate = 0
+                    self.variables[key]['substate'] = substate
+                state.join(key,self.value2float(key,value),substate)
         else:
             assert not isinstance(value,Distribution)
             state[key] = self.value2float(key,value)
@@ -1375,6 +1377,12 @@ class World(object):
         """
         return self.getFeature(stateKey(entity,feature),state,unique)
 
+    def getAction(self,name,state=None,unique=False):
+        """
+        :return: the C{ActionSet} last performed by the given entity
+        """
+        return self.getFeature(actionKey(name),state,unique)
+        
     def defineRelation(self,subj,obj,name,domain=float,lo=0.,hi=1.,**kwargs):
         """
         Defines a binary relationship between two agents
