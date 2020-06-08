@@ -1,7 +1,8 @@
 import random
 import numpy as np
-from psychsim.action import ActionSet
+from psychsim.world import World
 from psychsim.agent import Agent
+from psychsim.action import ActionSet
 from psychsim.probability import Distribution
 from psychsim.pwl import KeyedMatrix, KeyedVector, makeFuture, KeyedPlane, setToConstantMatrix, rewardKey, modelKey, \
     equalRow, makeTree
@@ -9,7 +10,6 @@ from psychsim.pwl import KeyedMatrix, KeyedVector, makeFuture, KeyedPlane, setTo
 __author__ = 'Pedro Sequeira, Stacy Marsella'
 __email__ = 'pedrodbs@gmail.com'
 
-from psychsim.world import World
 
 """
     PWL UTILITIES
@@ -152,7 +152,7 @@ def get_random_value(world, feature, rng=None):
     if domain is list or domain is set:
         return rng.choice(var['elements'])
     if domain is bool:
-        return bool(rng.randint(0, 2))
+        return bool(rng.randint(0, 1))
     return None
 
 
