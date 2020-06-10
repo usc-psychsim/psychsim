@@ -232,23 +232,23 @@ class Agent(object):
             horizon = min(horizon,self.getAttribute('horizon',model))
         if actions is None:
             # Consider all legal actions (legality determined by my belief, circumscribed by real world)
-            actions = self.getActions(belief)
+            actions = self.getLegalActions(belief)
         if len(actions) == 0:
             # Someone made a boo-boo because there is no legal action for this agent right now
             buf = StringIO()
-            if len(self.getActions(vector)) == 0:
+            if len(self.getLegalActions(vector)) == 0:
                 print('%s [%s] has no legal actions in:' % (self.name,model),file=buf)
                 self.world.printState(vector,buf)
             else:
                 print('%s has true legal actions:' % (self.name),\
-                      ';'.join(map(str,sorted(self.getActions(vector)))),file=buf)
-            if len(self.getActions(belief)) == 0:
+                      ';'.join(map(str,sorted(self.getLegalActions(vector)))),file=buf)
+            if len(self.getLegalActions(belief)) == 0:
                 print('%s has no legal actions when believing:' % (self.name),
                       file=buf)
                 self.world.printState(belief,buf)
             else:
                 print('%s believes it has legal actions:' % (self.name),\
-                      ';'.join(map(str,sorted(self.getActions(belief)))),file=buf)
+                      ';'.join(map(str,sorted(self.getLegalActions(belief)))),file=buf)
             msg = buf.getvalue()
             buf.close()
             raise RuntimeError(msg)
@@ -671,6 +671,9 @@ class Agent(object):
         return new
 
     def getActions(self,vector=None,actions=None):
+        raise DeprecationWarning('This method has been renamed "getLegalActions"')
+
+    def getLegalActions(self,vector=None,actions=None):
         """
         :param vector: the world in which to test legality
         :param actions: the set of actions to test legality of (default is all available actions)

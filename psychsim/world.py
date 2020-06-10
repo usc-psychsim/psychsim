@@ -352,8 +352,8 @@ class World(object):
             for name in toDecide:
                 # This agent might have a turn now
                 agent = self.agents[name]
-                decision = self.agents[name].decide(state,horizon,turn,None,tiebreak,
-                                                    agent.getActions(state),debug=debug.get(name,{}))
+                decision = self.agents[name].decide(state,horizon,turn,None,tiebreak,None,debug=debug.get(name,{}))
+#                                                    agent.getLegalActions(state),debug=debug.get(name,{}))
                 if name in debug:
                     debug[name]['__decision__'] = decision
                 try:
@@ -1031,7 +1031,7 @@ class World(object):
             newActions = set()
             name = agents.pop()
             for subset in actions:
-                for action in self.agents[name].getActions(vector):
+                for action in self.agents[name].getLegalActions(vector):
                     newActions.add(subset | action)
             return self.getActions(vector,agents,newActions)
         else:
@@ -1558,7 +1558,7 @@ class World(object):
                             V = {}
                             state = psychsim.pwl.KeyedVector(outcome['old'])
                             state[actorKey] = index
-                            for alternative in self.agents[actor].getActions(outcome['old']):
+                            for alternative in self.agents[actor].getLegalActions(outcome['old']):
                                 # Evaluate all available actions with respect to the hypothesized mental model
                                 V[alternative] = self.agents[actor].value(state,alternative,model=hypothesis['name'])['V']
                             if not actions in V:

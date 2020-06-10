@@ -20,7 +20,7 @@ def act(label):
     vector = world.state.domain()[0]
     assert len(world.next(vector)) == 1,'Forcing actions allowed only in serial execution'
     agent = world.agents[world.next(vector)[0]]
-    for action in agent.getActions(vector):
+    for action in agent.getLegalActions(vector):
         if str(action) == label:
             step({agent.name: action})
             break
@@ -34,7 +34,7 @@ def choose():
     choice = {}
     for name in world.next(vector):
         agent = world.agents[name]
-        actions = list(agent.getActions(vector))
+        actions = list(agent.getLegalActions(vector))
         actions.sort()
         for index in range(len(actions)):
             print('%d) %s' % (index,actions[index]))
