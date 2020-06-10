@@ -141,8 +141,8 @@ class KeyedVector(collections.abc.MutableMapping):
         Multiplies all of the weights so that the smallest weight is 1 and the relative values are preserved
         :return: the multiplier used
         """
-        alpha = 1./min([abs(v) for v in self._data.values()])
-        if abs(alpha-1.) > self.epsilon:
+        alpha = 1/min([abs(v) for v in self._data.values()])
+        if abs(alpha-1) > self.epsilon:
             self._string = None
             for key in self._data.keys():
                 self._data[key] *= alpha
@@ -268,7 +268,7 @@ class VectorDistribution(Distribution):
 
 #    def __init__(self,args=None):
 #        if args is None:
-#            args = {KeyedVector({keys.CONSTANT:1.}):1.}
+#            args = {KeyedVector({keys.CONSTANT:1}):1}
 #        Distribution.__init__(self,args)
 
     def keys(self):
