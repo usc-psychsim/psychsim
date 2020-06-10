@@ -368,7 +368,7 @@ class KeyedPlane:
                 operator = '\nAND '
             else:
                 operator = '\nOR '
-            self._string = operator.join(['%s %s %s' % (' + '.join(['%5.3f*%s' % (v,k)
+            self._string = operator.join(['%s %s %s' % (' + '.join(['%5.3f*%s' % (v,k) if isinstance(v,float) else '%d*%s' % (v,k)
                                                                     for k,v in vector.items()]),
                                                         self.COMPARISON_MAP[comparison],threshold)
                                           for vector,threshold,comparison in self.planes])
@@ -465,4 +465,4 @@ def equalFeatureRow(key1,key2):
     :return: a plane testing whether the values of the two given features are equal
     :rtype: L{KeyedPlane}
     """
-    return KeyedPlane(KeyedVector({key1: 1,key2: -1.}),0,0)
+    return KeyedPlane(KeyedVector({key1: 1,key2: -1}),0,0)
