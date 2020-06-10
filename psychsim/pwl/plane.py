@@ -420,19 +420,19 @@ def thresholdRow(key,threshold):
     :return: a plane testing whether the given keyed value exceeds the given threshold
     :rtype: L{KeyedPlane}
     """
-    return KeyedPlane(KeyedVector({key: 1.}),threshold)
+    return KeyedPlane(KeyedVector({key: 1}),threshold)
 def differenceRow(key1,key2,threshold):
     """
     :return: a plane testing whether the difference between the first and second keyed values exceeds the given threshold
     :rtype: L{KeyedPlane}
     """
-    return KeyedPlane(KeyedVector({key1: 1.,key2: -1.}),threshold)
+    return KeyedPlane(KeyedVector({key1: 1,key2: -1}),threshold)
 def greaterThanRow(key1,key2):
     """
     :return: a plane testing whether the first keyed value is greater than the second
     :rtype: L{KeyedPlane}
     """
-    return differenceRow(key1,key2,0.)
+    return differenceRow(key1,key2,0)
 def trueRow(key):
     """
     :return: a plane testing whether a boolean keyed value is True
@@ -450,19 +450,19 @@ def andRow(trueKeys=[],falseKeys=[]):
     """
     weights = {}
     for key in trueKeys:
-        weights[key] = 1.
+        weights[key] = 1
     for key in falseKeys:
-        weights[key] = -1.
-    return KeyedPlane(KeyedVector(weights),float(len(trueKeys))-0.5)
+        weights[key] = -1
+    return KeyedPlane(KeyedVector(weights),len(trueKeys)-0.5)
 def equalRow(key,value):
     """
     :return: a plane testing whether the given keyed value equals the given target value
     :rtype: L{KeyedPlane}
     """
-    return KeyedPlane(KeyedVector({key: 1.}),value,0)
+    return KeyedPlane(KeyedVector({key: 1}),value,0)
 def equalFeatureRow(key1,key2):
     """
     :return: a plane testing whether the values of the two given features are equal
     :rtype: L{KeyedPlane}
     """
-    return KeyedPlane(KeyedVector({key1: 1.,key2: -1.}),0,0)
+    return KeyedPlane(KeyedVector({key1: 1,key2: -1.}),0,0)

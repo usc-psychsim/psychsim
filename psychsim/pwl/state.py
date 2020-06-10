@@ -214,7 +214,7 @@ class VectorDistributionSet:
         domains = {substate: self.distributions[substate].domain() for substate in substates}
         for index in range(len(self)):
             vector = {}
-            prob = 1.
+            prob = 1
             for substate in substates:
                 subindex = index % len(self.distributions[substate])
                 subvector = domains[substate][subindex % len(domains[substate])]
@@ -232,7 +232,7 @@ class VectorDistributionSet:
         if incremental:
             prob = KeyedVector()
         else:
-            prob = 1.
+            prob = 1
         for distribution in self.distributions.values():
             if incremental:
                 prob.update(distribution.select(maximize,incremental))
@@ -286,7 +286,7 @@ class VectorDistributionSet:
                     substate += 1
             self.keyMap[key] = substate
         if not substate in self.distributions:
-            self.distributions[substate] = VectorDistribution({KeyedVector({keys.CONSTANT:1.}):1.})
+            self.distributions[substate] = VectorDistribution({KeyedVector({keys.CONSTANT:1}):1})
         return self.distributions[substate].join(key,value)
 
     def marginal(self,key):
@@ -321,7 +321,7 @@ class VectorDistributionSet:
         self.distributions.clear()
         self.keyMap.clear()
 
-    def update(self,other,keySet,scale=1.):
+    def update(self,other,keySet,scale=1):
         # Anyone else mixed up in this?
         toMerge = set(keySet)
         for key in keySet:
@@ -398,7 +398,7 @@ class VectorDistributionSet:
                 result = Distribution()
                 if destination is None:
                     # Every value is 100%
-                    total = 0.
+                    total = 0
                     for colKey in vector.keys():
                         if colKey == keys.CONSTANT:
                             # Doesn't really matter
@@ -419,7 +419,7 @@ class VectorDistributionSet:
                     for state in self.distributions[destination].domain():
                         prob = self.distributions[destination][state]
                         del self.distributions[destination][state]
-                        total = 0.
+                        total = 0
                         for colKey in vector.keys():
                             if colKey == keys.CONSTANT:
                                 # Doesn't really matter
@@ -501,7 +501,7 @@ class VectorDistributionSet:
                 if valSub is None:
                     vector = KeyedVector({k: self.distributions[self.keyMap[k]].first()[k] \
                                           for k in branchKeys})
-                    vector[keys.CONSTANT] = 1.
+                    vector[keys.CONSTANT] = 1
                     self *= other.children[other.branch.evaluate(vector)]
                 else:
                     assert len(other.branch.planes) == 1,'Unable to multiply by joint planes'
@@ -692,7 +692,7 @@ class VectorDistributionSet:
                 del dist[vector]
                 del vector[future]
                 if len(vector) > 1:
-                    dist[vector] = 1.
+                    dist[vector] = 1
                 else:
                     del self.distributions[newstate]
                 dist = self.distributions[oldstate]
@@ -791,7 +791,7 @@ class VectorDistributionSet:
                 newDist = {}
                 for vector in distribution.domain():
                     newValues = {subkey: vector[subkey] for subkey in intersection}
-                    newValues[keys.CONSTANT] = 1.
+                    newValues[keys.CONSTANT] = 1
                     newVector = vector.__class__(newValues)
                     newDist[newVector] = distribution[vector]+newDist.get(newVector,0.)
                 result.distributions[substate] = VectorDistribution(newDist)
@@ -809,7 +809,7 @@ class VectorDistributionSet:
                     assert other == keys.CONSTANT or self.keyMap[other] == self.keyMap[key] ,\
                         'Unmapped key %s is in vector\n\%s' % (other,vector)
             if sumToOne:
-                assert (sum(distribution.values())-1.)<.000001,'Distribution sums to %4.2f' % \
+                assert (sum(distribution.values())-1)<.000001,'Distribution sums to %4.2f' % \
                     (sum(distribution.values()))
             else:
                 assert sum(distribution.values())<1.000001,'Distribution sums to %4.2f' % \

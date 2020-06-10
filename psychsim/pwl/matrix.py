@@ -77,7 +77,7 @@ class KeyedMatrix(dict):
                     col = other[c1].items()
                 except KeyError:
                     if c1 == CONSTANT:
-                        col = [(CONSTANT,1.)]
+                        col = [(CONSTANT,1)]
                     else:
                         continue
                 for c2,value2 in col:
@@ -197,7 +197,7 @@ class KeyedMatrix(dict):
             if row in table:
                 result[row] = KeyedVector()
                 lo,hi = table[row]
-                constant = 0.
+                constant = 0
                 for col,value in items():
                     if col == row:
                         # Same value
@@ -278,13 +278,13 @@ def noChangeMatrix(key):
     :returns: a dynamics matrix indicating no change to the given keyed value
     :rtype: L{KeyedMatrix}
     """
-    return scaleMatrix(key,1.)
+    return scaleMatrix(key,1)
 def nullMatrix(key):
     """
     :returns: a fake dynamics matrix that doesn't change time
     :rtype: L{KeyedMatrix}
     """
-    return KeyedMatrix({key: KeyedVector({key: 1.})})
+    return KeyedMatrix({key: KeyedVector({key: 1})})
 def approachMatrix(key,weight,limit,limitKey=CONSTANT):
     """
     :param weight: the percentage by which you want the feature to approach the limit
@@ -296,7 +296,7 @@ def approachMatrix(key,weight,limit,limitKey=CONSTANT):
     :param limitKey: the feature whose value to approach (default is CONSTANT)
     :type limitKey: str
     """
-    return KeyedMatrix({makeFuture(key): KeyedVector({key: 1.-weight,
+    return KeyedMatrix({makeFuture(key): KeyedVector({key: 1-weight,
                                                       limitKey: weight*limit})})
 def incrementMatrix(key,delta):
     """
@@ -305,7 +305,7 @@ def incrementMatrix(key,delta):
     :returns: a dynamics matrix incrementing the given keyed value by the constant delta
     :rtype: L{KeyedMatrix}
     """
-    return KeyedMatrix({makeFuture(key): KeyedVector({key: 1.,CONSTANT: delta})})
+    return KeyedMatrix({makeFuture(key): KeyedVector({key: 1,CONSTANT: delta})})
 def setToConstantMatrix(key,value):
     """
     :type value: float
@@ -313,24 +313,24 @@ def setToConstantMatrix(key,value):
     :rtype: L{KeyedMatrix}
     """
     return KeyedMatrix({makeFuture(key): KeyedVector({CONSTANT: value})})
-def setToFeatureMatrix(key,otherKey,pct=1.,shift=0.):
+def setToFeatureMatrix(key,otherKey,pct=1,shift=0):
     """
     :type otherKey: str
     :returns: a dynamics matrix setting the given keyed value to a percentage of another keyed value plus a constant shift (default is 100% with shift of 0)
     :rtype: L{KeyedMatrix}
     """
     return KeyedMatrix({makeFuture(key): KeyedVector({otherKey: pct,CONSTANT: shift})})
-def addFeatureMatrix(key,otherKey,pct=1.):
+def addFeatureMatrix(key,otherKey,pct=1):
     """
     :type otherKey: str
     :returns: a dynamics matrix adding a percentage of another feature value to the given feature value (default percentage is 100%)
     :rtype: L{KeyedMatrix}
     """
-    return KeyedMatrix({makeFuture(key): KeyedVector({key: 1.,otherKey: pct})})
+    return KeyedMatrix({makeFuture(key): KeyedVector({key: 1,otherKey: pct})})
 def setTrueMatrix(key):
-    return setToConstantMatrix(key,1.)
+    return setToConstantMatrix(key,1)
 def setFalseMatrix(key):
-    return setToConstantMatrix(key,0.)
+    return setToConstantMatrix(key,0)
 
 class MatrixDistribution(Distribution):
     def update(self,matrix):
