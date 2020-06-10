@@ -1117,7 +1117,7 @@ class World(object):
                     self.symbols[element] = len(self.symbols)
                     self.symbolList.append(element)
         elif domain is bool:
-            self.variables[key].update({'lo': 0.,'hi': 1.})
+            self.variables[key].update({'lo': 0,'hi': 1})
         elif domain is ActionSet:
             # The actions of an agent
             if isinstance(lo,float):
