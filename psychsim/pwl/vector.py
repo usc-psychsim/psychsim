@@ -226,7 +226,7 @@ class KeyedVector(collections.abc.MutableMapping):
         if self._string is None:
             mykeys = list(self.keys())
             mykeys.sort()
-            self._string = '\n'.join(map(lambda k: '%s: %s' % (k,self[k]),mykeys))
+            self._string = '\n'.join(['%s: %s' % (k,self[k]) for k in mykeys])
         return self._string
 
     def __repr__(self):
