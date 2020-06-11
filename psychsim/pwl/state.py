@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import copy
 import itertools
+import logging
 import operator
 from xml.dom.minidom import Document,Node
 
@@ -528,6 +529,11 @@ class VectorDistributionSet:
                     assert states,'Empty result of multiplication'
                     if len(self.distributions[valSub].domain()) == 0:
                         del self.distributions[valSub]
+                    if first not in other.children:
+                        if first is None:
+                            logging.error('Missing fallback branch in tree:\n%s' % (str(other)))
+                        else:
+                            logging.error('Missing branch for value %s in tree:\n%s' % (first,str(other)))
                     self *= other.children[first]
                     for key in other.getKeysOut():
                         assert key in self.keyMap
