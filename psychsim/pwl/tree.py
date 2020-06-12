@@ -1,3 +1,5 @@
+import logging
+
 from xml.dom.minidom import Document,Node
 
 from psychsim.probability import Distribution
@@ -140,7 +142,12 @@ class KeyedTree:
         else:
             # Deterministic branch
             subindex = self.branch.evaluate(index)
-            return self.children[subindex][index]
+            try:
+                child = self.children[subindex]
+            except KeyError:
+                logging.error('Missing child for case %s in tree:\n%s' % (subindex,self))
+                raise ValueError('Missing child for case %s in tree' % (subindex))
+            return child[index]
 
     def desymbolize(self,table,debug=False):
         """
