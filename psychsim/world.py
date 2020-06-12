@@ -942,8 +942,13 @@ class World(object):
                 if key in vector.keyMap:
                     substate = vector.keyMap[key]
                     subvector = vector.distributions[substate]
-                    assert len(subvector) == 1,'World.next() does not operate on uncertain turns'
-                    if subvector.first()[key] == 0:
+                    if len(subvector) == 1:
+                        value = subvector.first()[key]
+                    else:
+                        dist = subvector.marginal(key)
+                        assert len(dist) == 1,'World.next() does not operate on uncertain turns:\n%s' % (dist)
+                        value = dist.first()
+                    if value == 0:
                         agents.add(turn2name(key))
             return agents
         else:
