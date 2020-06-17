@@ -82,14 +82,14 @@ class KeyedVector(collections.abc.MutableMapping):
             result = KeyedVector({key: value*other for key,value in self.items()})
             return result
         else:
-            return NotImplemented
+            return NotImplementedError
 
     def __rmul__(self,other):
         if isinstance(other,float) or isinstance(other,int):
             result = self.__class__({key: other*value for key,value in self.items()})
             return result
         else:
-            return NotImplemented
+            return NotImplementedError
 
     def __imul__(self,other):
         """
@@ -277,9 +277,9 @@ class VectorDistribution(Distribution):
         NOT the keys of the domain itself
         """
         if len(self) > 0:
-            return self.first().keys()
+            return {k for k in self.first().keys() if k != keys.CONSTANT}
         else:
-            return {}
+            return set()
     
     def join(self,key,value):
         """
@@ -405,7 +405,7 @@ class VectorDistribution(Distribution):
                     result[product] = self[vector]
             return Distribution(result)
         else:
-            return NotImplemented
+            return NotImplementedError
 
     def __imul__(self,other):
         original = [(vector, self[vector]) for vector in self.domain()]
@@ -447,3 +447,11 @@ class VectorDistribution(Distribution):
             vector.rollback(future)
             self.addProb(vector,prob)
         return self
+
+    def domain(self,key=None):
+        if isinstance(key,str):
+            return {v[key] for v in self.domain()}
+        elif key is None:
+            return super().domain()
+        else:
+            raise NotImplementedError('Domain available for only a single variable')
