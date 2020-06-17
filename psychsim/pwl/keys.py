@@ -107,8 +107,8 @@ def actionKey(name,future=False):
 def isActionKey(key):
     return isStateKey(key) and state2feature(key) == ACTION
 
-def modelKey(name):
-    return stateKey(name,MODEL)
+def modelKey(name,future=False):
+    return stateKey(name,MODEL,future)
 
 def isModelKey(key):
     return key[-(len(MODEL)+3):] == '\'s %s' % (MODEL)
