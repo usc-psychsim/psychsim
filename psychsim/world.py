@@ -1351,8 +1351,6 @@ class World(object):
         if isinstance(entity,Agent):
             entity = entity.name
         key = stateKey(entity,feature)
-        if substate is None and isinstance(self.state,VectorDistributionSet):
-            substate = len(self.state.keyMap)
         try:
             self.locals[entity][feature] = key
         except KeyError:
