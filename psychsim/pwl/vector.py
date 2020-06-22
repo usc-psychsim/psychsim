@@ -229,6 +229,10 @@ class KeyedVector(collections.abc.MutableMapping):
             self._string = '\n'.join(['%s: %s' % (k,self[k]) for k in mykeys])
         return self._string
 
+    def sortedString(self):
+        maxLength = max([len(key) for key in self])
+        return '\n'.join(['{:{width}} {}'.format(key+':',value,width=maxLength) for key,value in sorted(self.items())])
+
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__,dict(self))
 
@@ -270,6 +274,9 @@ class VectorDistribution(Distribution):
 #        if args is None:
 #            args = {KeyedVector({keys.CONSTANT:1}):1}
 #        Distribution.__init__(self,args)
+
+    def __contains__(self,key):
+        return key in self.first()
 
     def keys(self):
         """
@@ -455,3 +462,7 @@ class VectorDistribution(Distribution):
             return super().domain()
         else:
             raise NotImplementedError('Domain available for only a single variable')
+
+    def __str__(self):
+        return '\n'.join(['%d%%\n%s' % (prob*100,vector.sortedString()) 
+            for vector,prob in sorted(self.items(),key=lambda i: i[1],reverse=True)])
