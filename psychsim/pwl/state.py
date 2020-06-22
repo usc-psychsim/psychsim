@@ -59,6 +59,16 @@ class VectorDistributionSet:
                 value.distributions[substate] = VectorDistribution({element: prob})
             yield value
 
+    def probability(self,vector):
+        """
+        :type vector: KeyedVector
+        :return: the probability of the given world according to this state distribution
+        """
+        prob = 1
+        for key,value in vector.items():
+            prob *= self.marginal(key)[value]
+        return prob
+
     def __len__(self):
         """
         :return: the number of elements in the implied joint distribution
@@ -270,7 +280,7 @@ class VectorDistributionSet:
                         self.keyMap[key] = destination
         return destination
 
-    def join(self,key,value,substate=0):
+    def join(self,key,value,substate=None):
         """
         Modifies the distribution over vectors to have the given value for the given key
         :param key: the key to the column to modify
@@ -313,7 +323,7 @@ class VectorDistributionSet:
                 domains.append([[vector[k] for k in subkeys] for vector in dist.domain()])
             return [sum(combo,[]) for combo in itertools.product(*domains)]
         else:
-            return NotImplemented
+            return NotImplementedError
     
     def items(self):
         return self.distributions.items()
