@@ -154,18 +154,18 @@ class Agent(object):
                     print(mentalModel['policy'])
         return model['V'][horizon]
                             
-    def decide(self,vector=None,horizon=None,others=None,model=None,selection=None,actions=None,
+    def decide(self,state=None,horizon=None,others=None,model=None,selection=None,actions=None,
                keySet=None,debug={}):
         """
         Generate an action choice for this agent in the given state
 
-        :param vector: the current state in which the agent is making its decision
-        :type vector: L{KeyedVector}
+        :param state: the current state in which the agent is making its decision
+        :type state: L{KeyedVector}
         :param horizon: the value function horizon (default is use horizon specified in model)
         :type horizon: int
         :param others: the optional action choices of other agents in the current time step
         :type others: strS{->}L{ActionSet}
-        :param model: the mental model to use (default is model specified in vector)
+        :param model: the mental model to use (default is model specified in state)
         :type model: str
         :param selection: how to translate value function into action selection
            - random: choose one of the maximum-value actions at random
@@ -178,11 +178,11 @@ class Agent(object):
         :param actions: possible action choices (default is all legal actions)
         :param keySet: subset of state features to project over (default is all state features)
         """
-        if vector is None:
-            vector = self.world.state
+        if state is None:
+            state = self.world.state
         if model is None:
             try:
-                model = self.world.getModel(self.name,vector)
+                model = self.world.getModel(self.name,state)
             except KeyError:
                 # Use real model as fallback?
                 model = self.world.getModel(self.name)
@@ -193,7 +193,7 @@ class Agent(object):
             myAction = keys.stateKey(self.name,keys.ACTION)
             myModel = keys.modelKey(self.name)
             for submodel in model.domain():
-                result[submodel] = self.decide(vector,horizon,others,submodel,
+                result[submodel] = self.decide(state,horizon,others,submodel,
                                                selection,actions,keySet)
                 if isinstance(result[submodel]['action'],Distribution):
                     if len(result[submodel]['action']) > 1:
@@ -211,12 +211,12 @@ class Agent(object):
                 else:
                     plane = equalRow(myModel,submodel)
                     tree = {'if': plane, True: matrix,False: tree}
-            result['policy'] = makeTree(tree).desymbolize(self.world.symbols)
+            result['policy'] = makeTree(tree)
             return result
         if selection is None:
             selection = self.getAttribute('selection',model)
         # What are my subjective beliefs for this decision?
-        belief = self.getBelief(vector,model)
+        belief = self.getBelief(state,model)
         # Do I have a policy telling me what to do?
         policy = self.getAttribute('policy',model)
         if policy:
@@ -236,12 +236,12 @@ class Agent(object):
         if len(actions) == 0:
             # Someone made a boo-boo because there is no legal action for this agent right now
             buf = StringIO()
-            if len(self.getLegalActions(vector)) == 0:
+            if len(self.getLegalActions(state)) == 0:
                 print('%s [%s] has no legal actions in:' % (self.name,model),file=buf)
-                self.world.printState(vector,buf)
+                self.world.printState(state,buf)
             else:
                 print('%s has true legal actions:' % (self.name),\
-                      ';'.join(map(str,sorted(self.getLegalActions(vector)))),file=buf)
+                      ';'.join(map(str,sorted(self.getLegalActions(state)))),file=buf)
             if len(self.getLegalActions(belief)) == 0:
                 print('%s has no legal actions when believing:' % (self.name),
                       file=buf)
@@ -325,8 +325,8 @@ class Agent(object):
         # Compute value across possible worlds
         logging.debug('Considering %s as %s' % (action,model))
         current = copy.deepcopy(belief)
-        if model:
-            self.world.setFeature(modelKey(self.name),model,current)
+#        if model:
+#            self.world.setFeature(modelKey(self.name),model,current)
         V_A = self.getAttribute('V',model)
         if V_A:
             current *= V_A[action]
@@ -1014,21 +1014,66 @@ class Agent(object):
     """Belief update methods"""
     """---------------------"""
 
-    def resetBelief(self,model=None,include=None,ignore=None):
+    def resetBelief(self,state=None,model=None,include=None,ignore=None,stateType=VectorDistributionSet):
+        """
+        Handles all combinations of state type and specified belief type
+        """
+        assert ignore is None or include is None,'Use either ignore or include sets, but not both'
+        if state is None:
+            state = self.world.state
         if model is None:
-            assert len(self.models) == 1
-            model = list(self.models.keys())[0]
-        if isinstance(self.world.state,VectorDistributionSet):
-            beliefs = self.world.state.copySubset(ignore,include)
-        elif include is None:
-            if ignore is None:
-                beliefs = VectorDistributionSet(self.world.state)
+            assert len(self.models) == 1,'Model is unspecified and ambiguous'
+            model = next(iter(self.models.keys()))
+        if isinstance(state,VectorDistributionSet):
+            if issubclass(stateType,VectorDistributionSet):
+                beliefs = state.copySubset(ignore,include)
+            elif issubclass(stateType,KeyedVector):
+                vector = state.vector()
+                beliefs = stateType({key: vector[key] for key in include if key not in ignore})
+                assert CONSTANT in beliefs
             else:
-                beliefs = VectorDistributionSet({key: value for key,value in self.world.state.items() if key not in ignore})
-        elif ignore is None:
-                beliefs = VectorDistributionSet({key: value for key,value in self.world.state.items() if key in include})
+                assert issubclass(stateType,VectorDistribution),'Unknown type %s specified for %s beliefs' % (stateType.__name__,self.name)
+                beliefs = stateType()
+                for vector in state:
+                    beliefs.addProb(KeyedVector({key: vector[key] for key in include if key not in ignore}),prob)
+        elif isinstance(state,KeyedVector):
+            if ignore is None:
+                ignore = set()
+            if include is None:
+                include = state.keys()
+            if issubclass(stateType,KeyedVector):
+                beliefs = stateType({key: state[key] for key in include if key not in ignore})
+            elif issubclass(stateType,VectorDistribution):
+                beliefs = stateType({KeyedVector({key: state[key] for key in include if key not in ignore}): 1})
+            else:
+                assert issubclass(stateType,VectorDistributionSet),'Unknown type %s specified for %s beliefs' % (stateType.__name__,self.name)
+                beliefs = stateType()
+                for key in include:
+                    if key not in ignore:
+                        beliefs.join(key,state[key])
         else:
-            raise RuntimeError('Use either ignore or include sets, but not both')
+            if ignore is None:
+                ignore = set()
+            if include is None:
+                include = state.keys()
+            assert issubclass(state.__class__,VectorDistribution),'Unable to extract beliefs from state of type %s ' % (stateType.__name__)
+            if issubclass(stateType,VectorDistributionSet):
+                dist = state.__class__()
+                for vector in state.domain():
+                    dist.addProb(vector.__class__({key: vector[key] for key in include if key not in ignore}),state[vector])
+                beliefs = stateType(copy.deepcopy(dist))
+            elif issubclass(stateType,KeyedVector):
+                beliefs = stateType()
+                for key in include:
+                    if key not in ignore:
+                        value = state.marginal(key)
+                        assert len(value) == 1,'Unable to identify unique value for %s for %s beliefs' % (key,self.name)
+                        beliefs[key] = value.first()
+            else:
+                assert issubclass(stateType,VectorDistribution),'Unknown type %s specified for %s beliefs' % (stateType.__name__,self.name)
+                beliefs = stateType()
+                for vector in state.domain():
+                    beliefs.addProb(vector.__class__({key: vector[key] for key in include if key not in ignore}),state[vector])
         self.models[model]['beliefs'] = beliefs
         return beliefs
         
@@ -1039,17 +1084,19 @@ class Agent(object):
         else:
             self.models[model]['level'] = level
 
-    def setBelief(self,key,distribution,model=None):
+    def setBelief(self,key,distribution,model=None,state=None):
+        if state is None:
+            state = self.world.state
         if model is None:
-            dist = self.world.getModel(self.name,self.world.state)
+            dist = self.world.getModel(self.name,state)
             for model in dist.domain():
-                self.setBelief(key,distribution,model)
+                self.setBelief(key,distribution,model,state)
         try:
             beliefs = self.models[model]['beliefs']
         except KeyError:
             beliefs = True
         if beliefs is True:
-            beliefs = self.resetBelief(model)
+            beliefs = self.resetBelief(state,model)
         self.world.setFeature(key,distribution,beliefs)
 
     def getBelief(self,vector=None,model=None):
@@ -1075,11 +1122,117 @@ class Agent(object):
                 world = copy.deepcopy(beliefs)
             return world
 
-    def updateBeliefs(self,trueState,actions,horizon=None):
+    def updateBeliefs(self,state=None,actions=set(),horizon=None):
+        if state is None:
+            state = self.world.state
+        if isinstance(state,KeyedVector):
+            model = self.stateEstimator(state,actions,horizon)
+            vector[modelKey(self.name,True)] = self.world.value2float(modelKey(self.name),model)
+        else:
+            self.updateBeliefsOLD(state,actions,horizon)
+
+    def stateEstimator(self,state,actions,horizon=None):
+        if not isinstance(state,KeyedVector):
+            raise TypeError('Operates on only KeyedVector instances')
+        oldModel = self.world.getFeature(modelKey(self.name),state)
+        if self.getAttribute('static',oldModel) is True:
+            # My beliefs (and my current mental model) never change
+            newModel = state[modelKey(self.name)]
+        else:
+            SE = self.models[oldModel]['SE']
+            myAction = ActionSet({action for action in actions if action['subject'] == self.name})
+            omega = ','.join(['%s' % (state[o]) for o in self.omega])
+            if omega not in SE:
+                SE[omega] = {}
+            if myAction not in SE[omega]:
+                SE[omega][myAction] = {}
+            try:
+                newModel = SE[omega][myAction][horizon]
+                if newModel is None:
+                    # We're still processing
+                    newModel = self.models[oldModel]['index']
+                else:
+                    # We've finished processing this belief update
+                    newModel = self.models[newModel]['index']
+            except KeyError:
+                pass
+            oldBelief = self.getBelief(model=oldModel)
+            if myAction in self.models[oldModel]['SE'] and label in self.models[oldModel]['SE'][myAction]:
+                newModel = self.models[oldModel]['SE'][myAction][label]
+                if newModel is None:
+                    pass
+            else:
+                # Work to be done. First, mark that we've started processing this transition
+                if myAction not in self.models[oldModel]['SE']:
+                    self.models[oldModel]['SE'] = {myAction: {}}
+                self.models[oldModel]['SE'][myAction][label] = None
+                # Get old belief state.
+                beliefs = copy.deepcopy(original)
+                # Project direct effect of the actions, including possible observations
+                outcome = self.world.step({self.name: myAction} if myAction else None,beliefs,
+                    keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=False)
+                # Condition on actual observations
+                for omega in self.omega:
+                    value = vector[omega]
+                    if not omega in beliefs:
+                        continue
+                    for b in beliefs.distributions[beliefs.keyMap[omega]].domain():
+                        if b[omega] == value:
+                            break
+                    else:
+                        if omega == oldModelKey:
+                            continue
+                        else:
+                            logging.warning('%s (model %s) has impossible observation %s=%s when doing %s' % \
+                                          (self.name,oldModel,omega,self.world.float2value(omega,vector[omega]),myAction))
+                            SE[oldModel][label] = None
+                            break
+                    beliefs[omega] = vector[omega]
+                else:
+                    # Create model with these new beliefs
+                    # TODO: Look for matching model?
+                    for dist in beliefs.distributions.values():
+                        if len(dist) > 1:
+                            deletion = False
+                            for vec in dist.domain():
+                                if dist[vec] < self.epsilon:
+                                    del dist[vec]
+                                    deletion = True
+                            if deletion:
+                                dist.normalize()
+                    newModel = self.belief2model(oldModel,beliefs)
+                    SE[oldModel][label] = newModel['index']
+                    if oldModelKey in self.omega:
+                        # Observe this new model
+                        beliefs.join(oldModelKey,newModel['index'])
+#                    if oldModelKey in beliefs:
+                        # Update the model value in my beliefs? I don't think so, but maybe there's a reason to?
+#                        beliefs.join(oldModelKey,newModel['index'])
+                    self.models[oldModel]['SE'][myAction][label] = newModel['name']
+            if SE[oldModel][label] is not None:
+                # Insert new model into true state
+                if isinstance(SE[oldModel][label],int) or isinstance(SE[oldModel][label],float):
+                    vector[newModelKey] = SE[oldModel][label]
+                else:
+                    raise RuntimeError('Unable to process stochastic belief updates:%s' \
+                        % (SE[oldModel][olabel]))
+                newDist.addProb(vector,prob)
+        newDist.normalize()
+#        assert len(newDist) > 0
+#        for vector in newDist.domain():
+#            assert newModelKey in vector
+#            newModel = self.world.float2value(modelKey(self.name),vector[newModelKey])
+#            newBelief = self.getBelief(model=newModel)
+        return SE
+        return model
+
+    def updateBeliefsOLD(self,trueState=None,actions={},horizon=None):
         """
         .. warning:: Even if this agent starts with ``True`` beliefs, its beliefs can deviate after actions with stochastic effects (i.e., the world transitions to a specific state with some probability, but the agent only knows a posterior distribution over that resulting state). If you want the agent's beliefs to stay correct, then set the ``static`` attribute on the model to ``True``.
 
         """
+        if trueState is None:
+            trueState = self.world.state
         oldModelKey = modelKey(self.name)
         newModelKey = makeFuture(oldModelKey)
         # Find distribution over current belief models
@@ -1088,14 +1241,16 @@ class Agent(object):
         oldDist = trueState.distributions[substate]
         newDist = oldDist.__class__()
         trueState.distributions[substate] = newDist
-        # Find action that I performed
-        myAction = ActionSet({action for action in actions if action['subject'] == self.name})
         SE = {} # State estimator table
         for vector,prob in [(vector,oldDist[vector]) for vector in oldDist.domain()]:
             oldModel = self.world.float2value(oldModelKey,vector[oldModelKey])
             original = self.getBelief(model=oldModel)
             # Identify label for overall observation
             label = ','.join(['%s' % (self.world.float2value(omega,vector[omega])) for omega in self.omega])
+            if self.name in actions:
+                myAction = self.world.float2value(actionKey(self.name),vector[actionKey(self.name)])
+            else:
+                myAction = None
             if not oldModel in SE:
                 SE[oldModel] = {}
             if not label in SE[oldModel]:
@@ -1120,7 +1275,7 @@ class Agent(object):
                     beliefs = copy.deepcopy(original)
                     # Project direct effect of the actions, including possible observations
                     outcome = self.world.step({self.name: myAction} if myAction else None,beliefs,
-                        keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=False)
+                        keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=True)
                     # Condition on actual observations
                     for omega in self.omega:
                         value = vector[omega]
@@ -1175,7 +1330,7 @@ class Agent(object):
 #            newBelief = self.getBelief(model=newModel)
         return SE
     
-    def stateEstimator(self,oldReal,newReal,omega,model=True):
+    def stateEstimatorOLD(self,oldReal,newReal,omega,model=True):
         # Extract belief vector (in minimal diff form)
         try:
             oldBeliefDiff = self.models[model]['beliefs']
