@@ -82,7 +82,8 @@ class KeyedVector(collections.abc.MutableMapping):
             result = KeyedVector({key: value*other for key,value in self.items()})
             return result
         else:
-            raise NotImplementedError
+            return other.__rmul__(self)
+#            raise NotImplementedError
 
     def __rmul__(self,other):
         if isinstance(other,float) or isinstance(other,int):
