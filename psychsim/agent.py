@@ -313,7 +313,7 @@ class Agent(object):
             assert selection == 'consistent','Unknown action selection method: %s' % (selection)
             best.sort()
             result['action'] = best[0]
-        logging.debug('Choosing %s' % (action))
+        logging.debug('Choosing %s' % (result['action']))
         return result
 
     def value(self,belief,action,model,horizon=None,others=None,keySet=None,updateBeliefs=True,
