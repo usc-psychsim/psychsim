@@ -9,7 +9,7 @@ import pickle
 import time
 from xml.dom.minidom import Document,Node,parseString
 
-from psychsim.action import ActionSet,Action
+from psychsim.action import *
 import psychsim.probability
 from psychsim.pwl import *
 from psychsim.agent import Agent
@@ -40,20 +40,21 @@ class World(object):
     """
     memory = False
 
-    def __init__(self,xml=None,single=False):
+    def __init__(self,xml=None,stateType=VectorDistributionSet):
         """
         :param xml: Initialization argument, either an XML Element, or a filename
         :type xml: Node or str
-        :param single: If True, then there is no uncertainty about the state of this world (default is False)
-        :type single: bool
+        :param stateType: Class used for the world state
         """
         self.agents = {}
 
         # State feature information
-        if single:
-            self.state = KeyedVector({CONSTANT: 1.})
+        if issubclass(stateType,KeyedVector):
+            self.state = stateType({CONSTANT: 1})
+        elif issubclass(stateType,VectorDistribution):
+            self.state = stateType({KeyedVector({CONSTANT: 1}): 1})
         else:
-            self.state = VectorDistributionSet()
+            self.state = stateType()
         self.variables = {}
         self.locals = {}
         self.symbols = {}
@@ -140,371 +141,101 @@ class World(object):
         """
         if state is None:
             state = self.state
-        if keySubset is None and state is not self.state:
-            keySubset = state.keys()
-        if real is False:
-            state = copy.deepcopy(state)
-        outcome = {'old': state,
-                   'decisions': {},
-                   'effect': {}}
         # Check whether we are already in a terminal state
         if self.terminated(state):
             return state
+        self.dependency.getEvaluation()            
+        if keySubset is None:
+            keySubset = state.keys()
+        if real is False:
+            state = copy.deepcopy(state)
+        actions = act2dict(actions)
         # Determine the actions taken by the agents in this world
-        outcome['actions'] = self.stepPolicy(state,actions,horizon,tiebreak,keySubset,debug)
-        joint = ActionSet()
-        for actor,policy in outcome['actions'].items():
-            behavior = None
-            uncertain = False
-            key = stateKey(actor,ACTION)
-            for leaf in policy.leaves():
-                action = self.float2value(key,leaf[makeFuture(key)][CONSTANT])
-                if behavior is None:
-                    behavior = action
-                elif len(action & behavior) == 0:
-                    uncertain = True
-                    behavior = ActionSet(behavior | action)
-            joint = ActionSet(joint | behavior)
-#            if actor in debug:
-#                print('%s: %s' % (actor,policy))
-        effect = self.deltaState(joint,state,keySubset,uncertain)
+        state,policies,choices = self.deltaAction(state,actions,horizon,tiebreak,keySubset,debug)
+        # Compute the effect of the chosen actions
+        effect = self.deltaState(choices,state,keySubset)
         # Update turn order
-        effect.append(self.deltaTurn(state,joint))
+        effect.append(self.deltaTurn(state,policies))
         for stage in effect:
             state = self.applyEffect(state,stage,select)
         # The future becomes the present
         state.rollback()
-#        if select:
-#            prob = state.select(select=='max')
         if updateBeliefs:
             # Update agent models included in the original world
             # (after finding out possible new worlds)
-            if isinstance(state,VectorDistributionSet):
-                agentsModeled = [name for name in self.agents
-                                 if modelKey(name) in state.keyMap and self.agents[name].omega is not True]
-            else:
-                agentsModeled = [name for name in self.agents
-                                 if modelKey(name) in state and self.agents[name].omega is not True]
+            agentsModeled = [name for name in self.agents if modelKey(name) in state and self.agents[name].omega is not True]
             for name in agentsModeled:
                 key = modelKey(name)
                 agent = self.agents[name]
-                if isinstance(state,VectorDistributionSet):
-                    substate = state.collapse(agent.omega|{key},False)
-                delta = agent.updateBeliefs(state,joint,horizon=horizon)
-                if delta:
-                    if select:
-                        state.distributions[substate].select(select == 'max')
-        # The future becomes the present
-        state.rollback()
-        if isinstance(state,VectorDistributionSet):
+                substate = state.collapse(agent.omega +[key],False)
+                delta = agent.updateBeliefs(state,policies,horizon=horizon)
             if select:
-                state.select(select=='max')
+                state.distributions[substate].select(select == 'max')
+            # The future becomes the present
+            state.rollback()
+
+        if select:
+            state.select(select=='max')
         if self.memory:
             self.history.append(copy.deepcopy(state))
            # self.modelGC(False)
         return state
 
-    def stepFromVector(self,vector,actions=None,horizon=None,tiebreak=None,updateBeliefs=True,keySubset=None,real=True):
-        """
-        Compute the resulting states when starting in a given possible world (as opposed to a distribution over possible worlds)
-        """
-        outcome = {'old': vector,
-                   'decisions': {}}
-        # Check whether we are already in a terminal state
-        if self.terminated(vector):
-            outcome['new'] = outcome['old']
-            return outcome
-        # Determine the actions taken by the agents in this world
-        if actions is None:
-            outcome['actions'] = {}
-        else:
-            if isinstance(actions,Action):
-                actions = ActionSet([actions])
-            outcome['actions'] = copy.copy(actions)
-        # Keep track of whether there is uncertainty about the actions to perform
-        stochastic = []
-        if not isinstance(outcome['actions'],ActionSet) and not isinstance(outcome['actions'],list):
-            # ActionSet indicates that we should perform just these actions. 
-            # Otherwise, we look at whose turn it is:
-            turn = self.next(vector)
-            for name in outcome['actions'].keys():
-                if not (name in turn):
-                    raise NameError('Agent %s must wait for its turn' % (name))
-            for name in turn:
-                if not name in outcome['actions']:
-                    model = self.getModel(name,vector)
-                    decision = self.agents[name].decide(vector,None,horizon,outcome['actions'],model,tiebreak)
-                    outcome['decisions'][name] = decision
-                    outcome['actions'][name] = decision['action']
-                elif isinstance(outcome['actions'][name],Action):
-                    outcome['actions'][name] = ActionSet([outcome['actions'][name]])
-                if isinstance(outcome['actions'][name],psychsim.probability.Distribution):
-                    stochastic.append(name)
-        if stochastic:
-            # Merge effects of multiple possible actions into single effect
-            if len(stochastic) > 1:
-                raise NotImplementedError('Currently unable to handle stochastic expectations over multiple agents: %s' % (stochastic))
-            effects = []
-            for action in outcome['actions'][stochastic[0]].domain():
-                prob = outcome['actions'][stochastic[0]][action]
-                actions = dict(outcome['actions'])
-                actions[stochastic[0]] = action 
-                effect = self.effect(actions,outcome['old'],prob,updateBeliefs=updateBeliefs,keySubset=keySubset)
-                if len(effect) == 0:
-                    # No consistent transition for this action (don't blame me, I'm just the messenger)
-                    continue
-                elif 'new' in outcome:
-                    for vector in effect['new'].domain():
-                        try:
-                            outcome['new'][vector] += effect['new'][vector]
-                        except KeyError:
-                            outcome['new'][vector] = effect['new'][vector]
-                    outcome['effect'] += effect['effect']
-                else:
-                    outcome['new'] = effect['new']
-                    outcome['effect'] = effect['effect']
-        else:
-            effect = self.effect(outcome['actions'],outcome['old'],1.,updateBeliefs,keySubset,real)
-            outcome.update(effect)
-        if 'effect' in outcome:
-            if not 'new' in outcome:
-                # Apply effects
-                outcome['new'] = outcome['effect']*outcome['old']
-            if not 'delta' in outcome:
-                outcome['delta'] = outcome['new'] - outcome['old']
-        else:
-            # No consistent effect
-            pass
-        return outcome
-
-    def stepPolicy(self,state=None,actions=None,horizon=None,tiebreak=None,keySubset=None,debug={}):
+    def deltaAction(self,state=None,actions=None,horizon=None,tiebreak=None,keySubset=None,debug={}):
         if state is None:
             state = self.state
-        if isinstance(actions,Action):
-            actions = {actions['subject']: ActionSet({actions})}
-        elif isinstance(actions,ActionSet) or isinstance(actions,set):
-            actionDict = {}
-            for action in actions:
-                actionDict[action['subject']] = actionDict.get(action['subject'],[])+[action]
-            actions = {}
-            for name,policy in actionDict.items():
-                actions[name] = ActionSet(policy)
-        if isinstance(actions,dict):
-            for name,policy in list(actions.items()):
-                if isinstance(policy,ActionSet):
-                    # Transfer fixed action into policy
-                    key = keys.actionKey(name)
-                    turn = keys.turnKey(name)
-                    if isinstance(state,VectorDistributionSet):
-                        turns = state.domain(turn)
-                        if len(turns) == 1:
-                            if 0 in turns:
-                                actions[name] = makeTree(setToConstantMatrix(key,policy))
-                            else:
-                                logging.warning('Policy generated for %s out of turn' % (name))
-                                del actions[name]
-                        elif 0 in turns:
-                            actions[name] = makeTree({'if': equalRow(turnKey(name),0),
-                                                      True: setToConstantMatrix(key,policy),
-                                                      False: noChangeMatrix(key)})
-                        else:
-                            logging.warning('Policy generated for %s out of turn' % (name))
-                            del actions[name]
-                    else:
-                        turns = state[turn]
-                        if turns == 0:
-                            actions[name] = makeTree(setToConstantMatrix(key,policy))
-                        else:
-                            logging.warning('Policy generated for %s out of turn' % (name))
-                            del actions[name]
-            for name,policy in actions.items():
-                actions[name] = policy.desymbolize(self.symbols)
-        else:
-            assert actions is None
-            actions = {}
         if keySubset is None:
-            if isinstance(state,VectorDistributionSet):
-                keySubset = state.keyMap
-            else:
-                keySubset = state.keys()-{CONSTANT}
-        if isinstance(state,VectorDistributionSet):
-            toDecide = [name for name in self.agents if name not in actions and
-                        keys.turnKey(name) in keySubset and 0 in state.domain(keys.turnKey(name))]
-        else:
-            toDecide = [name for name in self.agents if name not in actions and state.get(keys.turnKey(name),1) == 0]
-        if self.parallel and state is self.state:
-            with multiprocessing.Pool() as pool:
-                results = [(name,pool.apply_async(self.agents[name].decide,
-                                                  args=(None,horizon,None,None,tiebreak,None)))
-                           for name in toDecide]
-                decisions = []
-                for name,result in results:
-                    decisions.append((name,result.get()))
-            for name,decision in decisions:
-                actions[name] = decision['policy']
-        else:
-            # if no one has decided yet, agents' decisions should be independent
-            if actions is None:
-                turn = {}
-            else:
-                turn = copy.copy(actions)
-
-            for name in toDecide:
-                # This agent might have a turn now
-                agent = self.agents[name]
-                decision = self.agents[name].decide(state,horizon,turn,None,tiebreak,None,debug=debug.get(name,{}))
-#                                                    agent.getLegalActions(state),debug=debug.get(name,{}))
-                if name in debug:
-                    debug[name]['__decision__'] = decision
-                try:
-                    actions[name] = decision['policy']
-                except KeyError:
-                    key = keys.stateKey(name,keys.ACTION)
-                    actions[name] = makeTree(setToConstantMatrix(key,decision['action'])).desymbolize(self.symbols)
-        if debug:
-            print(toDecide,debug)
-        if len(actions) == 0:
+            keySubset = state.keys()
+        choices = {}
+        policies = {}
+        for name in self.agents:
+            turn = keys.turnKey(name)
+            if turn in keySubset:
+                turns = state.domain(turn)
+                if len(turns) != 1:
+                    raise ValueError('Unable to process uncertain turns. Come back later.')
+                if 0 in turns:
+                    # This agent has a turn now
+                    action = keys.actionKey(name)
+                    if name in actions:
+                        # Translate any pre-specified actions into PWL policy
+                        if isinstance(actions[name],ActionSet):
+                            choices[name] = [actions[name]]
+                            policies[name] = makeTree(setToConstantMatrix(action,actions[name])).desymbolize(self.symbols)
+                        else:
+                            policies[name] = actions[name]
+                            choices[name] = {m[makeFuture(action)][CONSTANT] for m in policies[name].leaves()}
+                    else:
+                        agent = self.agents[name]
+                        decision = self.agents[name].decide(state,horizon,actions,None,tiebreak,None,debug=debug.get(name,{}))
+        #                                                    agent.getLegalActions(state),debug=debug.get(name,{}))
+                        if name in debug:
+                            debug[name]['__decision__'] = decision
+                        try:
+                            policies[name] = decision['policy']
+                            choices[name] = {m[makeFuture(action)][CONSTANT] for m in policies[name].leaves()}
+                            policies[name] = policies[name].desymbolize(self.symbols)
+                        except KeyError:
+                            choices[name] = [decision['action']]
+                            policies[name] = makeTree(setToConstantMatrix(action,decision['action'])).desymbolize(self.symbols)
+                elif name in actions:
+                    raise ValueError('Policy generated for %s out of turn' % (name))
+        if len(policies) == 0:
             self.printState(state)
             raise RuntimeError('Nobody has a turn!')
-        for name,policy in actions.items():
+        for name,policy in policies.items():
             state *= policy
-        return actions
+        return state,policies,choices
 
-    def deltaTurn(self,state,actions):
-        """
-        Computes the change in the turn order based on the given actions
-        :param start: The original state
-        :param end: The final state (which will be modified to reflect the new turn order)
-        :type start,end: L{VectorDistributionSet}
-        :returns: The dynamics functions applied to update the turn order
-        """
-        if isinstance(state,VectorDistributionSet):
-            keySet = state.keyMap.keys()
-        else:
-            keySet = state.keys()
-        turnKeys = {k for k in keySet if isTurnKey(k)}
-        dynamics = {}
-        for key in turnKeys:
-            dynamics.update(self.getTurnDynamics(key,actions))
-        return dynamics
-
-    def applyEffect(self,state,effect,select=False):
-        for key,dynamics in effect.items():
-            if dynamics is None:
-                # No dynamics, so status quo
-                newKey = makeFuture(key)
-                if isinstance(state,VectorDistributionSet):
-                    substate = state.keyMap[key]
-                    state.keyMap[newKey] = substate
-                    dist = state.distributions[substate]
-                    for vector in dist.domain():
-                        prob = dist[vector]
-                        del dist[vector]
-                        vector[newKey] = vector[key]
-                        dist[vector] = prob
-                elif isinstance(state,VectorDistribution):
-                    original = dict(state)
-                    domain = state.domain()
-                    state.clear()
-                    for row in domain:
-                        assert isinstance(row,KeyedVector)
-                        prob = original[hash(row)]
-                        row[newKey] = row[key]
-                        state[row] = prob
-                else:
-                    state[newKey] = state[key]
-            elif len(dynamics) == 1:
-                tree = dynamics[0]
-                if select:
-                    if select == 'max':
-                        tree = tree.sample(True,None if isinstance(state,VectorDistributionSet) else state)
-                    elif select is True:
-                        tree = tree.sample(False,None if isinstance(state,VectorDistributionSet) else state)
-                    elif key not in select:
-                        # We are selecting a specific value, just not for this particular state feature
-                        tree = tree.sample(False,None if isinstance(state,VectorDistributionSet) else state)
-                    state *= tree
-#                    state.__imul__(tree,True)
-                else:
-                    try:
-                        state *= tree
-                    except StopIteration:
-                        self.printState(state)
-                        print(tree)
-                        raise RuntimeError
-                    except KeyError:
-                        print('Applying effect on %s' % (key))
-                        print('Effect tree is\n%s' % (tree))
-                        print('State contains only: %s' % (sorted(state.keys())))
-                        if isinstance(state,KeyedVector):
-                            self.printVector(state)
-                        elif isinstance(state,VectorDistributionSet):
-                            self.printState(state)
-                        else:
-                            for vec in state.domain():
-                                print(state[vec])
-                                self.printVector(vec)
-                        raise
-            else:
-                cumulative = None
-                for tree in dynamics:
-                    if cumulative is None:
-                        cumulative = copy.deepcopy(tree)
-                    else:
-                        cumulative.makeFuture([key])
-                        cumulative *= tree
-                tree = cumulative
-                if select:
-                    if isinstance(state,VectorDistributionSet):
-                        state.__imul__(tree,select)
-                    else:
-                        if isinstance(tree,KeyedMatrix):
-                            state *= tree
-                        else:
-                            raise TypeError('Unable to generate selective effect from:\n%s' % (tree))
-                else:
-                    state *= tree
-            if select and isinstance(state,VectorDistributionSet):
-                substate = state.keyMap[makeFuture(key)]
-                if len(state.distributions[substate]) > 1:
-                    if isinstance(select,dict) and key in select:
-                        state[makeFuture(key)] = select[key]
-        return state
-                
-    def effect(self,actions,state,updateBeliefs=True,keySubset=None,select=False,horizon=None):
-#        if not isinstance(state,VectorDistributionSet):
-#            state = psychsim.pwl.VectorDistributionSet(state)
-        result = {'new': state,'effect': []}
-        if updateBeliefs:
-            # Update agent models included in the original world
-            # (after finding out possible new worlds)
-            if isinstance(state,VectorDistributionSet):
-                agentsModeled = [name for name in self.agents
-                                 if modelKey(name) in result['new'].keyMap and self.agents[name].omega is not True]
-            else:
-                agentsModeled = [name for name in self.agents
-                                 if modelKey(name) in result['new'] and self.agents[name].omega is not True]
-            for name in agentsModeled:
-                key = modelKey(name)
-                agent = self.agents[name]
-                if isinstance(result['new'],VectorDistributionSet):
-                    substate = result['new'].collapse(agent.omega|{key},False)
-                delta = agent.updateBeliefs(result['new'],actions,horizon=horizon)
-                if delta:
-                    result['effect'].append(delta)
-                    if select:
-                        result['new'].distributions[substate].select(select == 'max')
-        return result
-
-    def deltaState(self,actions,state,keySubset=None,uncertain=False):
+    def deltaState(self,actions,state,uncertain=False):
         """
         Computes the change across a subset of state features
         """
         # Figure out the order in which to update vector elements
         keyOrder = []
         for keySet in self.dependency.getEvaluation():
-            if not keySubset is None:
-                keySet = keySet & keySubset # {k for k in keySet if k in keySubset}
+            if state is not self.state:
+                keySet = [k for k in keySet if k in state]
             if len(keySet) > 0:
                 keyOrder.append(keySet)
         if TERMINATED in state:
@@ -512,87 +243,114 @@ class World(object):
         count = 0
         effects = []
         for keySet in keyOrder:
-            dynamics = self.getActionEffects(actions,keySet,uncertain)
+            dynamics = self.getActionEffects(actions,keySet)
 #            dynamics = {}
             for key in keySet:
                 if key not in dynamics:
                     dynamics[key] = None
-#                count += 1
-#                if state is self.state:
-#                    start = time.time()
-#                dynamics[key] = self.getDynamics(key,actions)
-#                if len(dynamics[key]) == 0:
-#                    # No dynamics, no change
-#                    dynamics[key] = None
-#                if state is self.state:
-#                    print('Computing dynamics of %s' % (key),time.time()-start)
             effects.append(dynamics)
         return effects
 
-    def multiDeltaVector(self,actions,old,keys):
-        new = psychsim.pwl.VectorDistribution({old: 1.})
-        for key in keys:
-            partial = self.singleDeltaVector(actions,old,key)
-            if isinstance(partial,psychsim.pwl.KeyedVector):
-                if key in partial:
-                    new.join(key,psychsim.probability.Distribution({partial[key]: 1.}))
-            else:
-                new.join(key,partial.marginal(key))
-        return new
+    def deltaTurn(self,state,actions=None):
+        """
+        Computes the change in the turn order based on the given actions
+        :param start: The original state
+        :param end: The final state (which will be modified to reflect the new turn order)
+        :type start,end: L{VectorDistributionSet}
+        :returns: The dynamics functions applied to update the turn order
+        """
+        turnKeys = {k for k in state.keys() if isTurnKey(k)}
+        dynamics = {}
+        for key in turnKeys:
+            dynamics.update(self.getTurnDynamics(key,actions))
+        return dynamics
 
-    def singleDeltaVector(self,actions,old,key,dynamics=None):
-        """
-        :type old: L{psychsim.pwl.KeyedVector}
-        """
-        if dynamics is None:
-            dynamics = self.getDynamics(key,actions,old)
-        if dynamics:
-            if len(dynamics) == 1:
-                # Single effect
-                matrix = dynamics[0][old]
-                if matrix is None:
-                    # Null effect
-                    return old
-                else:
-                    newValue = matrix*old
-                if isinstance(newValue,psychsim.pwl.KeyedVector):
-                    # Deterministic effect
-                    new = psychsim.pwl.KeyedVector(old)
-                    new.update(newValue)
-                else:
-                    # Stochastic effect
-                    new = psychsim.pwl.VectorDistribution({old: 1.})
-                    if not isinstance(newValue,psychsim.pwl.VectorDistribution):
-                        # We're going to just go ahead and treat the result as a VectorDistribution,
-                        # because we don't play by your rules
-                        newValue = psychsim.pwl.VectorDistribution(newValue)
-                    new.join(key,newValue.marginal(key))
-                return new
-            else:
-                # Multiply deltas in sequence (expand branches as necessary in the future)
-                assert self.variables[key]['combinator'] == '*',\
-                    'No valid combinator specified for multiple effects on %s' % (key)
-                for tree in dynamics:
-                    # Iterate through each tree (possibly ordered)
-                    if isinstance(old,psychsim.pwl.KeyedVector):
-                        # Certain state
-                        old = self.singleDeltaVector(actions,old,key,[tree])
-                    else:
-                        # Uncertain state
-                        new = psychsim.pwl.VectorDistribution()
-                        for oldVector in old.domain():
-                            partial = self.singleDeltaVector(actions,oldVector,key,[tree])
-                            if isinstance(partial,psychsim.pwl.KeyedVector):
-                                # Deterministic effect
-                                new.addProb(partial,old[oldVector])
-                            else:
-                                # Stochastic effect
-                                for newVector in partial.domain():
-                                    new.addProb(newVector,old[oldVector]*partial[newVector])
-                        old = new
-                return old
+    def applyEffect(self,state,effect,select=False):
+        if isinstance(effect,list):
+            for stage in effect:
+                state = self.applyEffect(state,stage,select)
         else:
-            return old
+            for key,dynamics in effect.items():
+                if dynamics is None:
+                    # No dynamics, so status quo
+                    newKey = makeFuture(key)
+                    if isinstance(state,VectorDistributionSet):
+                        substate = state.keyMap[key]
+                        state.keyMap[newKey] = substate
+                        dist = state.distributions[substate]
+                        for vector in dist.domain():
+                            prob = dist[vector]
+                            del dist[vector]
+                            vector[newKey] = vector[key]
+                            dist[vector] = prob
+                    elif isinstance(state,VectorDistribution):
+                        original = dict(state)
+                        domain = state.domain()
+                        state.clear()
+                        for row in domain:
+                            assert isinstance(row,KeyedVector)
+                            prob = original[hash(row)]
+                            row[newKey] = row[key]
+                            state[row] = prob
+                    else:
+                        state[newKey] = state[key]
+                elif len(dynamics) == 1:
+                    tree = dynamics[0]
+                    if select:
+                        if select == 'max':
+                            tree = tree.sample(True,None if isinstance(state,VectorDistributionSet) else state)
+                        elif select is True:
+                            tree = tree.sample(False,None if isinstance(state,VectorDistributionSet) else state)
+                        elif key not in select:
+                            # We are selecting a specific value, just not for this particular state feature
+                            tree = tree.sample(False,None if isinstance(state,VectorDistributionSet) else state)
+                        state *= tree
+    #                    state.__imul__(tree,True)
+                    else:
+                        try:
+                            state *= tree
+                        except StopIteration:
+                            self.printState(state)
+                            print(tree)
+                            raise RuntimeError
+                        except KeyError:
+                            print('Applying effect on %s' % (key))
+                            print('Effect tree is\n%s' % (tree))
+                            print('State contains only: %s' % (sorted(state.keys())))
+                            if isinstance(state,KeyedVector):
+                                self.printVector(state)
+                            elif isinstance(state,VectorDistributionSet):
+                                self.printState(state)
+                            else:
+                                for vec in state.domain():
+                                    print(state[vec])
+                                    self.printVector(vec)
+                            raise
+                else:
+                    cumulative = None
+                    for tree in dynamics:
+                        if cumulative is None:
+                            cumulative = copy.deepcopy(tree)
+                        else:
+                            cumulative.makeFuture([key])
+                            cumulative *= tree
+                    tree = cumulative
+                    if select:
+                        if isinstance(state,VectorDistributionSet):
+                            state.__imul__(tree,select)
+                        else:
+                            if isinstance(tree,KeyedMatrix):
+                                state *= tree
+                            else:
+                                raise TypeError('Unable to generate selective effect from:\n%s' % (tree))
+                    else:
+                        state *= tree
+                if select and isinstance(state,VectorDistributionSet):
+                    substate = state.keyMap[makeFuture(key)]
+                    if len(state.distributions[substate]) > 1:
+                        if isinstance(select,dict) and key in select:
+                            state[makeFuture(key)] = select[key]
+        return state
 
     def addTermination(self,tree,action=True):
         """
@@ -825,7 +583,7 @@ class World(object):
 
     def addActionEffects(self):
         """
-        For backward compatibility with scenarios that didn't this from the beginning
+        For backward compatibility with scenarios that didn't do this from the beginning
         """
         for key,table in list(self.dynamics.items()):
             for action,dynamics in table.items():
@@ -838,28 +596,59 @@ class World(object):
                         self.dynamics[atom] = {}
                     self.dynamics[atom][key] = dynamics
 
-    def getActionEffects(self,actions,keySubset,uncertain=False,dynamics=None):
+    def getActionEffects(self,joint,keySet,dynamics=None):
         """
         :param uncertain: True iff there is uncertainty about which actions will be performed
         """
         if dynamics is None:
             dynamics = {}
-        if actions in self.dynamics:
-            for key,tree in self.dynamics[actions].items():
-                if key in keySubset:
-                    if uncertain:
-                        tree = self.getConditionalDynamics(actions,key,tree)
+        if isinstance(joint,ActionSet):
+            for key,tree in self.dynamics[joint].items():
+                if key in keySet:
                     try:
                         dynamics[key].append(tree)
                     except KeyError:
                         dynamics[key] = [tree]
-        elif len(actions) > 1:
-            for action in actions:
-                self.getActionEffects(ActionSet(action),keySubset,uncertain,dynamics)
-        # Look for "universal" dynamics for any state feature with no other dynamics
-        for key,tree in self.dynamics.get(True,{}).items():
-            if key in keySubset and key not in dynamics:
-                dynamics[key] = [tree]
+            if len(joint) > 1:
+                for action in joint:
+                    self.getActionEffects(ActionSet(action),keySet,dynamics)
+        elif isinstance(joint,dict):
+            for name,actions in joint.items():
+                if len(actions) == 1:
+                    # Single action choice
+                    self.getActionEffects(next(iter(actions)),keySet,dynamics)
+                else:
+                    # Multiple possible actions
+                    trees = {}
+                    subject = actionKey(next(iter(actions))['subject'],True)
+                    for action in actions:
+                        partial = self.getActionEffects(ActionSet(action),keySet)
+                        for key,subtree in partial.items():
+                            assert len(subtree) == 1,'Unable to merge concurrent effects of %s on %s' % (action,key)
+                            try:
+                                trees[key][action] = subtree[0]
+                            except KeyError:
+                                trees[key] = {action: subtree[0]}
+                    for key,tree in trees.items():
+                        branches = sorted(tree.keys())
+                        tree['if'] = equalRow(subject,branches)
+                        if len(branches) < len(actions):
+                            # Need an else branch
+                            try:
+                                tree[None] = self.dynamics[True][key]
+                            except KeyError:
+                                tree[None] = noChangeMatrix(key)
+                        tree = makeTree(tree)
+                        try:
+                            dynamics[key].append(tree)
+                        except KeyError:
+                            dynamics[key] = [tree]
+            # Look for "universal" dynamics for any state feature with no other dynamics
+            for key,tree in self.dynamics.get(True,{}).items():
+                if key in keySet and key not in dynamics:
+                    dynamics[key] = [tree]
+        else:
+            raise TypeError('Unknown type of action specification: %s' % (joint.__class__.__name__))
         return dynamics
 
     def getConditionalDynamics(self,action,key,tree=None):
@@ -934,9 +723,9 @@ class World(object):
         """
         if vector is None:
             vector = self.state
+        if len(self.turnKeys) == 0 and vector is self.state:
+            self.turnKeys = {key for key in vector.keys() if isTurnKey(key)}
         if isinstance(vector,VectorDistributionSet):
-            if len(self.turnKeys) == 0:
-                self.turnKeys = {key for key in vector.keyMap.keys() if isTurnKey(key)}
             agents = set()
             for key in self.turnKeys:
                 if key in vector.keyMap:
@@ -951,6 +740,13 @@ class World(object):
                     if value == 0:
                         agents.add(turn2name(key))
             return agents
+        elif isinstance(vector,VectorDistribution):
+            items = []
+            for key in self.turnKeys:
+                if key in vector.keys():
+                    dist = vector.marginal(key)
+                    assert len(dist) == 1,'World.next() does not operate on uncertain turns:\n%s' % (dist)
+                    items.append((key,dist.first()))
         else:
             items = [i for i in vector.items() if isTurnKey(i[0])]
         if len(items) == 0:
@@ -1005,19 +801,13 @@ class World(object):
         return delta
 
     def getTurnDynamics(self,key,actions):
-        if not isinstance(actions,ActionSet):
-            actions = ActionSet(actions)
         dynamics = self.getDynamics(key,actions)
         if len(dynamics) == 0:
             # Create default dynamics
             agent = turn2name(key)
-            for atom in actions:
-                if atom['subject'] == agent:
-                    tree = psychsim.pwl.makeTree(
-                        {'if': psychsim.pwl.thresholdRow(key,0.5),
-                         True: psychsim.pwl.incrementMatrix(key,-1),
-                         False: psychsim.pwl.setToConstantMatrix(key,self.maxTurn)})
-                    break
+            if agent in actions:
+                # This agent took a turn; go to the end of the line
+                tree = psychsim.pwl.makeTree(psychsim.pwl.setToConstantMatrix(key,self.maxTurn))
             else:
                 tree = psychsim.pwl.makeTree(psychsim.pwl.incrementMatrix(key,-1))
 #            self.setTurnDynamics(name,actions,tree)
@@ -1197,6 +987,8 @@ class World(object):
                         substate = 0
                     self.variables[key]['substate'] = substate
                 state.join(key,self.value2float(key,value),substate)
+        elif isinstance(state,VectorDistribution):
+            state.join(key,self.value2float(key,value))
         else:
             assert not isinstance(value,Distribution)
             state[key] = self.value2float(key,value)
@@ -1312,15 +1104,15 @@ class World(object):
         if state is None:
             state = self.state
         assert key in self.variables,'Unknown element "%s"' % (key)
-        if isinstance(state,VectorDistributionSet):
+        if isinstance(state,KeyedVector):
+            return self.float2value(key,state[key])
+        else:
             marginal = state.marginal(key)
             if unique:
                 assert len(marginal) == 1,'Unique value requested for %s, but uncertain value exists' % (key)
                 return self.float2value(key,marginal).first()
             else:
                 return self.float2value(key,marginal)
-        else:
-            return self.float2value(key,state[key])
 
     def getValue(self,key,state=None):
         """
@@ -1380,7 +1172,7 @@ class World(object):
         """
         return self.getFeature(stateKey(entity,feature),state,unique)
 
-    def getAction(self,name,state=None,unique=False):
+    def getAction(self,name=None,state=None,unique=False):
         """
         :return: the C{ActionSet} last performed by the given entity
         """
@@ -1410,29 +1202,16 @@ class World(object):
     """Mental model methods"""
     """------------------"""
 
-    def getModel(self,modelee,vector=None):
+    def getModel(self,modelee,state=None,unique=False):
         """
         :returns: the name of the model of the given agent indicated by the given state vector
         :type modelee: str
-        :type vector: L{psychsim.pwl.KeyedVector}
+        :type state: L{psychsim.pwl.KeyedVector}
         :rtype: str
         """
-        if vector is None:
-            vector = self.state
-        agent = self.agents[modelee]
-        if isinstance(vector,VectorDistributionSet):
-            key = modelKey(modelee)
-            if key in self.variables:
-                model = self.getFeature(key,vector)
-            else:
-                assert len(agent.models) == 1,'Ambiguous model of %s' % (modelee)
-                model = agent.models.keys()[0]
-        else:
-            try:
-                model = agent.index2model(vector[modelKey(modelee)])
-            except KeyError:
-                model = True
-        return model
+        if state is None:
+            state = self.state
+        return self.getFeature(modelKey(modelee),state,unique)
 
     def getMentalModel(self,modelee,vector):
         raise DeprecationWarning('Substitute getModel instead (sorry for pedanticism, but a "model" may be real, not "mental")')
@@ -1760,6 +1539,16 @@ class World(object):
                             self.printDelta(node['old'],node['new'],buf,prefix=tab+prefix)
                         for index in range(len(node['projection'])):
                             nodes.insert(index,node['projection'][index])
+
+    def resymbolize(self,state=None):
+        if state is None:
+            state = self.state
+        if isinstance(state,KeyedVector):
+            return state.__class__({key: self.float2value(key,value) for key,value in state.items() if key != CONSTANT})
+        elif isinstance(state,VectorDistribution):
+            return state.__class__({self.resymbolize(vector): prob for vector,prob in state.items()})
+        else:
+            raise NotImplementedError
 
     def printBeliefs(self,name,state=None,buf=None,prefix='',beliefs=True):
         models = self.getModel(name,state)
