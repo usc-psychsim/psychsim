@@ -226,6 +226,23 @@ def makeActionSet(subject,verb,obj=None):
     else:
         return ActionSet([Action({'subject': subject,'verb': verb,'object': obj})])
 
+def act2dict(actions):
+    """
+    :return: a dictionary (indexed by actor) of actions equivalent to the Action, ActionSet, or dictionary passed in
+    """
+    if isinstance(actions,Action):
+        actions = {actions['subject']: ActionSet({actions})}
+    elif isinstance(actions,ActionSet) or isinstance(actions,set):
+        actionDict = {}
+        for action in actions:
+            actionDict[action['subject']] = actionDict.get(action['subject'],[])+[action]
+        actions = {name: ActionSet(policy) for name,policy in actionDict.items()}
+    elif actions is None:
+        actions = {}
+    else:
+        assert isinstance(actions,dict),'Unable to handle actions of type %s' % (actions.__class__.__name__)
+    return actions
+
 if __name__ == '__main__':
     act1 = Action({'subject': 'I','verb': 'help','object': 'you'})    
     act2 = Action({'subject': 'you','verb': 'help','object': 'I'})
