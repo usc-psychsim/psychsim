@@ -151,6 +151,8 @@ class Distribution(dict):
         :param quantify: if ``True``, also returns the amount of mass by which the sampling crosssed the threshold of the generated sample's range
         :returns: an element from this domain, with a sample probability given by this distribution
         """
+        if len(self) == 0:
+            raise ValueError('Cannot sample from empty distribution')
         import random
         selection = random.uniform(0.,sum(self.values()))
         original = selection
