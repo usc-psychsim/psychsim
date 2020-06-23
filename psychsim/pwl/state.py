@@ -323,7 +323,7 @@ class VectorDistributionSet:
                 domains.append([[vector[k] for k in subkeys] for vector in dist.domain()])
             return [sum(combo,[]) for combo in itertools.product(*domains)]
         else:
-            return NotImplementedError
+            raise NotImplementedError
     
     def items(self):
         return self.distributions.items()
@@ -379,7 +379,7 @@ class VectorDistributionSet:
                 result.distributions[substate] = value + other.distributions[substate]
             return result
         else:
-            return NotImplemented
+            raise NotImplementedError
 
     def __sub__(self,other):
         if isinstance(other,self.__class__):
@@ -390,7 +390,7 @@ class VectorDistributionSet:
                 result.distributions[substate] = value - other.distributions[substate]
             return result
         else:
-            return NotImplemented
+            raise NotImplementedError
 
     def __imul__(self,other,select=False):
         if isinstance(other,KeyedMatrix):
@@ -581,7 +581,7 @@ class VectorDistributionSet:
                         vector[keys.VALUE] += other[key]*vector[key]
                 self.distributions[destination][vector] = prob
         else:
-            return NotImplemented
+            raise NotImplementedError
 #        for s in self.distributions:
 #            assert s in self.keyMap.values(),'%d: %s' % (s,';'.join(['%s: %d' % (k,self.keyMap[k]) for k in self.distributions[s].keys() if k != keys.CONSTANT]))
 #        for k,s in self.keyMap.items():
@@ -612,7 +612,7 @@ class VectorDistributionSet:
 #                    assert s in self.distributions
             return total
         else:
-            return NotImplemented
+            raise NotImplementedError
 
     def rollback(self):
         """

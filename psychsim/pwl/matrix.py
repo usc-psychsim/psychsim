@@ -118,7 +118,7 @@ class KeyedMatrix(dict):
         elif isinstance(other,VectorDistribution):
             return self.mulByDistribution(other)
         else:
-            return NotImplemented
+            raise NotImplementedError
 
     def __rmul__(self,other):
         if isinstance(other,KeyedVector):
@@ -139,7 +139,7 @@ class KeyedMatrix(dict):
                 result[key] = other*value
             return result
         else:
-            return NotImplemented
+            raise NotImplementedError
         return result
             
     def getKeysIn(self):

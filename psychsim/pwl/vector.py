@@ -82,14 +82,14 @@ class KeyedVector(collections.abc.MutableMapping):
             result = KeyedVector({key: value*other for key,value in self.items()})
             return result
         else:
-            return NotImplementedError
+            raise NotImplementedError
 
     def __rmul__(self,other):
         if isinstance(other,float) or isinstance(other,int):
             result = self.__class__({key: other*value for key,value in self.items()})
             return result
         else:
-            return NotImplementedError
+            raise NotImplementedError
 
     def __imul__(self,other):
         """
@@ -412,7 +412,7 @@ class VectorDistribution(Distribution):
                     result[product] = self[vector]
             return Distribution(result)
         else:
-            return NotImplementedError
+            raise NotImplementedError
 
     def __imul__(self,other):
         original = [(vector, self[vector]) for vector in self.domain()]

@@ -292,7 +292,7 @@ class KeyedTree:
         elif isinstance(other,float) or isinstance(other,int):
             return other*self
         else:
-            return NotImplemented
+            raise NotImplementedError
         
     def __rmul__(self,other):
         if isinstance(other,float) or isinstance(other,int):
@@ -310,7 +310,7 @@ class KeyedTree:
                                 {value: other*self.children[value] for value in self.children})
             return tree
         else:
-            return NotImplemented
+            raise NotImplementedError
 
     def max(self,other):
         return self.compose(other,self.__max)
@@ -787,7 +787,7 @@ def makeTree(table):
                 tree = {'if': equalRow(table['case'],key),
                         True: table[key], False: tree}
             else:
-                return NotImplemented
+                raise NotImplementedError
         return makeTree(tree)
     elif 'distribution'in table:
         # Probabilistic branch
