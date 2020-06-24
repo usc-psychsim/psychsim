@@ -1003,12 +1003,12 @@ class Agent(object):
             # Have not printed out this model before
             if isinstance(previous,set):
                 previous.add(model['name'])
+            print('%s%s=%s' % (prefix,self.name,model['name']),file=buf)
             if reward and 'R' in model and not model['R'] is True:
                 self.printReward(model['name'],buf,'%s\t\t' % (prefix))
             if 'beliefs' in model and not model['beliefs'] is True:
-                print('%s\t\t\t----beliefs:----' % (prefix),file=buf)
+                print('%s\t\t\tB' % (prefix),file=buf)
                 self.world.printState(model['beliefs'],buf,prefix+'\t\t\t',beliefs=True,models=previous)
-                print('%s\t\t\t----------------' % (prefix),file=buf)
         
     """---------------------"""
     """Belief update methods"""
@@ -1074,6 +1074,8 @@ class Agent(object):
                 beliefs = stateType()
                 for vector in state.domain():
                     beliefs.addProb(vector.__class__({key: vector[key] for key in include if key not in ignore}),state[vector])
+        if modelKey(self.name) in beliefs:
+            self.world.setFeature(modelKey(self.name),model,beliefs)
         self.models[model]['beliefs'] = beliefs
         return beliefs
         
@@ -1205,9 +1207,6 @@ class Agent(object):
                     if oldModelKey in self.omega:
                         # Observe this new model
                         beliefs.join(oldModelKey,newModel['index'])
-#                    if oldModelKey in beliefs:
-                        # Update the model value in my beliefs? I don't think so, but maybe there's a reason to?
-#                        beliefs.join(oldModelKey,newModel['index'])
                     self.models[oldModel]['SE'][myAction][label] = newModel['name']
             if SE[oldModel][label] is not None:
                 # Insert new model into true state
@@ -1270,7 +1269,7 @@ class Agent(object):
                     beliefs = copy.deepcopy(original)
                     # Project direct effect of the actions, including possible observations
                     outcome = self.world.step({self.name: myAction} if myAction else None,beliefs,
-                        keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=False)
+                        keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=True)
                     # Condition on actual observations
                     for o in self.omega:
                         if o not in beliefs:
@@ -1305,13 +1304,13 @@ class Agent(object):
                         if oldModelKey in self.omega:
                             # Observe this new model
                             self.world.setFeature(oldModelKey,newModel,beliefs)
-#                            beliefs.join(oldModelKey,newModel['index'])
             # Insert new model into true state
             if isinstance(newModel,str):
                 vector[newModelKey] = self.world.value2float(oldModelKey,newModel)
                 newDist.addProb(vector,prob)
             elif newModel is not None:
                 raise RuntimeError('Unable to process stochastic belief updates: %s' % (newModel))
+        assert len(newDist) > 0,'Impossible observations'
         newDist.normalize()
         return trueState
     
