@@ -783,7 +783,12 @@ class VectorDistributionSet:
         return result
     
     def __str__(self):
-        return '\n'.join(['%s:\n%s' % (sub,dist) for sub,dist in self.items()])
+        certain = [dist for dist in self.distributions.values() if len(dist) == 1]
+        vector = KeyedVector()
+        for dist in certain:
+            vector.update({key: value for key,value in dist.first().items() if key != keys.CONSTANT})
+        return '%s\n%s' % (vector.sortedString(),'\n------------'.join([str(dist) for dist in self.distributions.values() 
+            if len(dist) > 1]))
 
     def copySubset(self,ignore=None,include=None):
         result = self.__class__()
