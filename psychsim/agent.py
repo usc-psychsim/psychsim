@@ -1223,7 +1223,6 @@ class Agent(object):
 #            assert newModelKey in vector
 #            newModel = self.world.float2value(modelKey(self.name),vector[newModelKey])
 #            newBelief = self.getBelief(model=newModel)
-        return SE
         return model
 
     def updateBeliefsOLD(self,trueState=None,actions={},horizon=None):
@@ -1241,58 +1240,54 @@ class Agent(object):
         oldDist = trueState.distributions[substate]
         newDist = oldDist.__class__()
         trueState.distributions[substate] = newDist
-        SE = {} # State estimator table
         for vector,prob in [(vector,oldDist[vector]) for vector in oldDist.domain()]:
             oldModel = self.world.float2value(oldModelKey,vector[oldModelKey])
-            original = self.getBelief(model=oldModel)
-            # Identify label for overall observation
-            label = ','.join(['%s' % (self.world.float2value(omega,vector[omega])) for omega in self.omega])
-            if self.name in actions:
-                myAction = self.world.float2value(actionKey(self.name),vector[actionKey(self.name)])
+            if self.getAttribute('static',oldModel) is True:
+                # My beliefs (and my current mental model) never change
+                newModel = oldModel
             else:
-                myAction = None
-            if not oldModel in SE:
-                SE[oldModel] = {}
-            if not label in SE[oldModel]:
-                if self.getAttribute('static',oldModel) is True:
-                    # My beliefs (and my current mental model) never change
-                    SE[oldModel][label] = vector[oldModelKey]
-                elif myAction in self.models[oldModel]['SE'] and \
-                     label in self.models[oldModel]['SE'][myAction]:
-                    newModel = self.models[oldModel]['SE'][myAction][label]
+                SE = self.models[oldModel]['SE']
+                # Identify label for overall observation
+                omega = tuple([vector[o] for o in self.omega])
+                if omega not in SE:
+                    SE[omega] = {}
+                if self.name in actions:
+                    myAction = self.world.float2value(actionKey(self.name),vector[actionKey(self.name)])
+                else:
+                    myAction = None
+                if myAction not in SE[omega]:
+                    SE[omega][myAction] = {}
+                if horizon in SE[omega][myAction]:
+                    newModel = SE[omega][myAction][horizon]
                     if newModel is None:
-                        # We're still processing
-                        SE[oldModel][label] = self.models[oldModel]['index']
-                    else:
-                        # We've finished processing this belief update
-                        SE[oldModel][label] = self.models[newModel]['index']
+                        # Processing this somewhere above me in the recursion
+                        newModel = oldModel
                 else:
                     # Work to be done. First, mark that we've started processing this transition
-                    if myAction not in self.models[oldModel]['SE']:
-                        self.models[oldModel]['SE'] = {myAction: {}}
-                    self.models[oldModel]['SE'][myAction][label] = None
+                    SE[omega][myAction][horizon] = None
+                    original = self.getBelief(model=oldModel)
                     # Get old belief state.
                     beliefs = copy.deepcopy(original)
                     # Project direct effect of the actions, including possible observations
                     outcome = self.world.step({self.name: myAction} if myAction else None,beliefs,
-                        keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=True)
+                        keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=False)
                     # Condition on actual observations
-                    for omega in self.omega:
-                        value = vector[omega]
-                        if not omega in beliefs:
+                    for o in self.omega:
+                        if o not in beliefs:
                             continue
-                        for b in beliefs.distributions[beliefs.keyMap[omega]].domain():
-                            if b[omega] == value:
+                        value = vector[o]
+                        for b in beliefs.distributions[beliefs.keyMap[o]].domain():
+                            if b[o] == value:
                                 break
                         else:
-                            if omega == oldModelKey:
+                            if o == oldModelKey:
                                 continue
                             else:
+                                newModel = None
                                 logging.warning('%s (model %s) has impossible observation %s=%s when doing %s' % \
-                                              (self.name,oldModel,omega,self.world.float2value(omega,vector[omega]),myAction))
-                                SE[oldModel][label] = None
+                                              (self.name,oldModel,o,self.world.float2value(o,vector[o]),myAction))
                                 break
-                        beliefs[omega] = vector[omega]
+                        beliefs[o] = vector[o]
                     else:
                         # Create model with these new beliefs
                         # TODO: Look for matching model?
@@ -1305,30 +1300,20 @@ class Agent(object):
                                         deletion = True
                                 if deletion:
                                     dist.normalize()
-                        newModel = self.belief2model(oldModel,beliefs)
-                        SE[oldModel][label] = newModel['index']
+                        newModel = self.belief2model(oldModel,beliefs)['name']
+                        SE[omega][myAction][horizon] = newModel
                         if oldModelKey in self.omega:
                             # Observe this new model
-                            beliefs.join(oldModelKey,newModel['index'])
-    #                    if oldModelKey in beliefs:
-                            # Update the model value in my beliefs? I don't think so, but maybe there's a reason to?
-    #                        beliefs.join(oldModelKey,newModel['index'])
-                        self.models[oldModel]['SE'][myAction][label] = newModel['name']
-            if SE[oldModel][label] is not None:
-                # Insert new model into true state
-                if isinstance(SE[oldModel][label],int) or isinstance(SE[oldModel][label],float):
-                    vector[newModelKey] = SE[oldModel][label]
-                else:
-                    raise RuntimeError('Unable to process stochastic belief updates:%s' \
-                        % (SE[oldModel][olabel]))
+                            self.world.setFeature(oldModelKey,newModel,beliefs)
+#                            beliefs.join(oldModelKey,newModel['index'])
+            # Insert new model into true state
+            if isinstance(newModel,str):
+                vector[newModelKey] = self.world.value2float(oldModelKey,newModel)
                 newDist.addProb(vector,prob)
+            elif newModel is not None:
+                raise RuntimeError('Unable to process stochastic belief updates: %s' % (newModel))
         newDist.normalize()
-#        assert len(newDist) > 0
-#        for vector in newDist.domain():
-#            assert newModelKey in vector
-#            newModel = self.world.float2value(modelKey(self.name),vector[newModelKey])
-#            newBelief = self.getBelief(model=newModel)
-        return SE
+        return trueState
     
     def stateEstimatorOLD(self,oldReal,newReal,omega,model=True):
         # Extract belief vector (in minimal diff form)
