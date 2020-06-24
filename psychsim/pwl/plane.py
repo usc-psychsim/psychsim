@@ -368,9 +368,7 @@ class KeyedPlane:
                 operator = '\nAND '
             else:
                 operator = '\nOR '
-            self._string = operator.join(['%s %s %s' % (' + '.join(['%5.3f*%s' % (v,k) if isinstance(v,float) else '%d*%s' % (v,k)
-                                                                    for k,v in vector.items()]),
-                                                        self.COMPARISON_MAP[comparison],threshold)
+            self._string = operator.join(['%s %s %s' % (vector.hyperString(),self.COMPARISON_MAP[comparison],threshold)
                                           for vector,threshold,comparison in self.planes])
         return self._string
 

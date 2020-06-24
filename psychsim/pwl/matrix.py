@@ -227,14 +227,10 @@ class KeyedMatrix(dict):
     def update(self,other):
         self._string = None
         dict.update(self,other)
-    
+
     def __str__(self):
         if self._string is None:
-            joiner = lambda item: '%5.3f*%s' % (item[1],item[0]) if isinstance(item[1],float) else '%s*%s' % (item[1],item[0])
-            self._string = '\n'.join(map(lambda item: '%s) %s' % \
-                                             (item[0],'+'.join(map(joiner,
-                                                                    item[1].items()))),
-                                         self.items()))
+            self._string = '\n'.join(['%s) %s' % (col,vec.hyperString()) for col,vec in sorted(self.items())])
         return self._string
 
     def __hash__(self):

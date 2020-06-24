@@ -234,6 +234,39 @@ class KeyedVector(collections.abc.MutableMapping):
         maxLength = max([len(key) for key in self])
         return '\n'.join(['{:{width}} {}'.format(key+':',value,width=maxLength) for key,value in sorted(self.items())])
 
+    def hyperString(self):
+        """
+        :return: a string representation of this vector treating it as a weighted sum
+        """
+        def term2str(coef,key):
+            if isinstance(coef,float):
+                if key == keys.CONSTANT:
+                    return '%5.3f' % (coef,key)
+                else:
+                    return '%5.3f*%s' % (coef,key)
+            elif key == keys.CONSTANT:
+                return '%d' % (coef)
+            elif coef == 1:
+                return '%s' % (key)
+            elif coef == -1:
+                return '-%s' % (key)
+            else:
+                return '%d*%s' % (coef,key)
+        rowStr = None
+        items = sorted(self.items())
+        if items[0][0] == keys.CONSTANT:
+            items.append(items[0])
+            del items[0]
+        for key,coef in items:
+            substr = term2str(coef,key)
+            if rowStr is None:
+                rowStr = substr
+            elif substr[0] == '-':
+                rowStr += substr
+            else:
+                rowStr += '+%s' % (substr)
+        return rowStr
+
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__,dict(self))
 
