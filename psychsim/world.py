@@ -167,7 +167,7 @@ class World(object):
             for name in agentsModeled:
                 key = modelKey(name)
                 agent = self.agents[name]
-                substate = state.collapse(agent.omega +[key],False)
+                substate = state.collapse(agent.omega+[key],False)
                 delta = agent.updateBeliefs(state,policies,horizon=horizon)
             if select:
                 state.distributions[substate].select(select == 'max')
@@ -1042,6 +1042,8 @@ class World(object):
         raise DeprecationWarning('Use value2float method instead')
 
     def float2value(self,key,flt):
+        if isFuture(key):
+            key = makePresent(key)
         if isinstance(flt,psychsim.probability.Distribution):
             # Decode each element
             value = flt.__class__()
@@ -1553,6 +1555,13 @@ class World(object):
             return state.__class__({key: self.float2value(key,value) for key,value in state.items() if key != CONSTANT})
         elif isinstance(state,VectorDistribution):
             return state.__class__({self.resymbolize(vector): prob for vector,prob in state.items()})
+        elif isinstance(state,VectorDistributionSet):
+            result = state.__class__()
+            for substate,distribution in state.distributions.items():
+                result.distributions[substate] = self.resymbolize(distribution)
+                for key in distribution.keys():
+                    result.keyMap[key] = substate
+            return result
         else:
             raise NotImplementedError
 
@@ -1575,38 +1584,14 @@ class World(object):
         """
         if distribution is None:
             distribution = self.state
-        if isinstance(distribution,VectorDistributionSet):
-            minKeys = {s: None for s in distribution.distributions}
-            certain = KeyedVector()
-            for key,substate in distribution.keyMap.items():
-                if key != keys.CONSTANT:
-                    entity = keys.state2agent(key)
-                    if entity is None:
-                        feature = keys.state2feature(key)
-                        key = stateKey(keys.WORLD,feature)
-                    if minKeys[substate] is None or key < minKeys[substate]:
-                        minKeys[substate] = key
-            minKeys = [(k,s) for s,k in minKeys.items()]
-            minKeys = [item[1] for item in sorted(minKeys)]
-
-            remaining = []
-            for substate in minKeys:
-                if len(distribution.distributions[substate]) == 1:
-                    certain.update(distribution.distributions[substate].first())
-                else:
-                    remaining.append(substate)
-            self.printVector(certain,buf,prefix,first,beliefs,models=models)
-            for label in remaining:
-                subdistribution = distribution.distributions[label]
-                if not label is None:
-                    print('-------------------',file=buf)
-                self.printState(subdistribution,buf,prefix,beliefs,first,models)
-        elif isinstance(distribution,KeyedVector):
-            self.printVector(distribution,buf,prefix,beliefs,models=models)
-        else:
-            for vector in distribution.domain():
-                print('%s%d%%' % (prefix,distribution[vector]*100.),file=buf)
-                self.printVector(vector,buf,prefix,beliefs=beliefs,models=models)
+        print(prefix+str(self.resymbolize(distribution)).replace('\n','\n%s' % (prefix)),file=buf)
+        if models is None:
+            models = set()
+        for name in self.agents:
+            if modelKey(name) in distribution:
+                dist = self.getFeature(modelKey(name),distribution)
+                for model in sorted(dist.domain()):
+                    self.agents[name].printModel(model,buf,reward=True,previous=models)
 
     def printVector(self,vector,buf=None,prefix='',first=True,beliefs=False,csv=False,models=None):
         """
