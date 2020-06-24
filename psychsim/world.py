@@ -620,7 +620,8 @@ class World(object):
                 else:
                     # Multiple possible actions
                     trees = {}
-                    subject = actionKey(next(iter(actions))['subject'],True)
+                    subjectNow = actionKey(next(iter(actions))['subject'])
+                    subject = makeFuture(subjectNow)
                     for action in actions:
                         partial = self.getActionEffects(ActionSet(action),keySet)
                         for key,subtree in partial.items():
@@ -629,9 +630,14 @@ class World(object):
                                 trees[key][action] = subtree[0]
                             except KeyError:
                                 trees[key] = {action: subtree[0]}
-                    for key,tree in trees.items():
-                        branches = sorted(tree.keys())
-                        tree['if'] = equalRow(subject,branches)
+                    for key,branches in trees.items():
+                        values = []
+                        tree = {}
+                        for action,subtree in branches.items():
+                            value = self.value2float(subjectNow,action)
+                            tree[len(values)] = subtree
+                            values.append(value)
+                        tree['if'] = equalRow(subject,values)
                         if len(branches) < len(actions):
                             # Need an else branch
                             try:
