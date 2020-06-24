@@ -231,7 +231,7 @@ class KeyedVector(collections.abc.MutableMapping):
         return self._string
 
     def sortedString(self):
-        maxLength = max([len(key) for key in self])
+        maxLength = max([len(key) for key in self])+1
         return '\n'.join(['{:{width}} {}'.format(key+':',value,width=maxLength) for key,value in sorted(self.items())])
 
     def hyperString(self):
@@ -241,7 +241,7 @@ class KeyedVector(collections.abc.MutableMapping):
         def term2str(coef,key):
             if isinstance(coef,float):
                 if key == keys.CONSTANT:
-                    return '%5.3f' % (coef,key)
+                    return '%5.3f' % (coef)
                 else:
                     return '%5.3f*%s' % (coef,key)
             elif key == keys.CONSTANT:
