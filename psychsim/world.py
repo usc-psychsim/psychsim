@@ -168,9 +168,9 @@ class World(object):
                 key = modelKey(name)
                 agent = self.agents[name]
                 substate = state.collapse(agent.omega+[key],False)
-                delta = agent.updateBeliefs(state,policies,horizon=horizon)
-            if select:
-                state.distributions[substate].select(select == 'max')
+                agent.updateBeliefs(state,policies,horizon=horizon)
+                if select:
+                    state.distributions[substate].select(select == 'max')
             # The future becomes the present
             state.rollback()
 
