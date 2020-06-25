@@ -1585,13 +1585,14 @@ class World(object):
         if distribution is None:
             distribution = self.state
         print(prefix+str(self.resymbolize(distribution)).replace('\n','\n%s' % (prefix)),file=buf)
-        if models is None:
-            models = set()
-        for name in self.agents:
-            if modelKey(name) in distribution:
-                dist = self.getFeature(modelKey(name),distribution)
-                for model in sorted(dist.domain()):
-                    self.agents[name].printModel(model,buf,reward=True,previous=models)
+        if beliefs:
+            if models is None:
+                models = set()
+            for name in self.agents:
+                if modelKey(name) in distribution:
+                    dist = self.getFeature(modelKey(name),distribution)
+                    for model in sorted(dist.domain()):
+                        self.agents[name].printModel(model,buf,reward=True,previous=models)
 
     def printVector(self,vector,buf=None,prefix='',first=True,beliefs=False,csv=False,models=None):
         """
