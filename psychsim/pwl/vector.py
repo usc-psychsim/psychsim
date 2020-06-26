@@ -245,7 +245,10 @@ class KeyedVector(collections.abc.MutableMapping):
                 else:
                     return '%5.3f*%s' % (coef,key)
             elif key == keys.CONSTANT:
-                return '%d' % (coef)
+                if isinstance(coef,int):
+                    return '%d' % (coef)
+                else:
+                    return '%s' % (coef)
             elif coef == 1:
                 return '%s' % (key)
             elif coef == -1:
