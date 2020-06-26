@@ -787,7 +787,7 @@ class VectorDistributionSet:
         vector = KeyedVector()
         for dist in certain:
             vector.update({key: value for key,value in dist.first().items() if key != keys.CONSTANT})
-        return '%s\n%s' % (vector.sortedString(),'\n------------'.join([str(dist) for dist in self.distributions.values() 
+        return '%s\n%s' % (vector.sortedString(),'\n---\n'.join([str(dist) for dist in self.distributions.values() 
             if len(dist) > 1]))
 
     def copySubset(self,ignore=None,include=None):
