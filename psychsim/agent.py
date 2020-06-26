@@ -1285,6 +1285,10 @@ class Agent(object):
                                 newModel = None
                                 logging.warning('%s (model %s) has impossible observation %s=%s when doing %s' % \
                                               (self.name,oldModel,o,self.world.float2value(o,vector[o]),myAction))
+                                if o in self.world.dynamics and myAction in self.world.dynamics[o]:
+                                    logging.warning('Action effect is:\n%s' % (self.world.dynamics[o][myAction]))
+                                    logging.warning('Original values are:\n%s' % ('\n'.join(['\t%s: %s (%d)' % (k,self.world.getFeature(k,vector),vector[k])
+                                        for k in self.world.dynamics[o][myAction].getKeysIn() if k !=CONSTANT])))
                                 break
                         beliefs[o] = vector[o]
                     else:
