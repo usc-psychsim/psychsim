@@ -1,5 +1,5 @@
-# atomic
-Agents with Theory Of Mind for Intelligent Collaboration
+# PsychSim
+Decision-theoretic agents with Theory of Mind for social simulation.
 
 # Documentation
 The latests documentation can be found [here][3].
@@ -7,7 +7,7 @@ The latests documentation can be found [here][3].
 # Installation/Development
 In order to install the module for development (see pip [docs][1]):
 
-1. clone the repository: `git clone https://github.com/usc-psychsim/atomic.git`
+1. clone the repository: `git clone https://github.com/usc-psychsim/psychsim.git`
 2. `cd` into the repository directory and use: `pip install -e .`
 3. remove later if desired using: `pip uninstall psychsim`
 
@@ -15,7 +15,7 @@ Using the `-e` argument will allow you to actively work on the package locally w
 
 To install from a `requrements.txt` (i.e. as part of an automated docker build) [use][2]:
 ```
--e git+https://github.com/usc-psychsim/atomic.git#egg=psychsim
+-e git+https://github.com/usc-psychsim/psychsim.git#egg=psychsim
 ```
 
 [1]: https://pip.pypa.io/en/stable/reference/pip_install/#editable-installs
