@@ -887,7 +887,7 @@ class Agent(object):
         :param name: the label for this model
         :type name: sotr
         
-    :returns: the model created
+        :returns: the model created
         :rtype: dict
         """
         if name is None:
@@ -1003,12 +1003,13 @@ class Agent(object):
             # Have not printed out this model before
             if isinstance(previous,set):
                 previous.add(model['name'])
-            print('%s%s=%s' % (prefix,self.name,model['name']),file=buf)
-            if reward and 'R' in model and not model['R'] is True:
-                self.printReward(model['name'],buf,'%s\t\t' % (prefix))
-            if 'beliefs' in model and not model['beliefs'] is True:
-                print('%s\t\t\tB' % (prefix),file=buf)
-                self.world.printState(model['beliefs'],buf,prefix+'\t\t\t',beliefs=True,models=previous)
+            if ('R' in model and model['R'] is not None) or 'beliefs' in model:
+                print('%s%s=%s' % (prefix,self.name,model['name']),file=buf)
+                if reward and 'R' in model and model['R'] is not None:
+                    self.printReward(model['name'],buf,'%s\t\t' % (prefix))
+                if 'beliefs' in model and not model['beliefs'] is True:
+                    print('%s\t\t\tB' % (prefix),file=buf)
+                    self.world.printState(model['beliefs'],buf,prefix+'\t\t\t',beliefs=True,models=previous)
         
     """---------------------"""
     """Belief update methods"""
@@ -1287,6 +1288,8 @@ class Agent(object):
                                               (self.name,oldModel,o,self.world.float2value(o,vector[o]),myAction))
                                 if o in self.world.dynamics and myAction in self.world.dynamics[o]:
                                     logging.warning('Action effect is:\n%s' % (self.world.dynamics[o][myAction]))
+                                    logging.warning('Believed values are:\n%s' % ('\n'.join(['\t%s: %s' % (k,self.world.getFeature(k,original))
+                                        for k in self.world.dynamics[o][myAction].getKeysIn() if k !=CONSTANT])))
                                     logging.warning('Original values are:\n%s' % ('\n'.join(['\t%s: %s (%d)' % (k,self.world.getFeature(k,vector),vector[k])
                                         for k in self.world.dynamics[o][myAction].getKeysIn() if k !=CONSTANT])))
                                 break
@@ -1316,6 +1319,14 @@ class Agent(object):
                 raise RuntimeError('Unable to process stochastic belief updates: %s' % (newModel))
         assert len(newDist) > 0,'Impossible observations'
         newDist.normalize()
+        change = False
+        for vec in newDist.domain():
+            if newDist[vec] < 1e-8:
+                del newDist[vec]
+                change = True
+        if change:
+            assert len(newDist) > 0
+            newDist.normalize()
         return trueState
 
     """------------------"""
