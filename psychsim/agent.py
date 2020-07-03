@@ -1274,7 +1274,7 @@ class Agent(object):
                     # Condition on actual observations
                     for o in self.omega:
                         if o not in beliefs:
-                            continue
+                            raise ValueError('Observable variable %s missing from beliefs of %s' % (o,self.name))
                         value = vector[o]
                         for b in beliefs.distributions[beliefs.keyMap[o]].domain():
                             if b[o] == value:
@@ -1291,7 +1291,7 @@ class Agent(object):
                                     logging.warning('Believed values are:\n%s' % ('\n'.join(['\t%s: %s' % (k,self.world.getFeature(k,original))
                                         for k in self.world.dynamics[o][myAction].getKeysIn() if k !=CONSTANT])))
                                     logging.warning('Original values are:\n%s' % ('\n'.join(['\t%s: %s (%d)' % (k,self.world.getFeature(k,vector),vector[k])
-                                        for k in self.world.dynamics[o][myAction].getKeysIn() if k !=CONSTANT])))
+                                        for k in self.world.dynamics[o][myAction].getKeysIn() if k !=CONSTANT and k in vector])))
                                 break
                         beliefs[o] = vector[o]
                     else:
