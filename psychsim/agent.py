@@ -557,33 +557,30 @@ class Agent(object):
             print('Completed after %d iterations' % (iterations))
         return self.getAttribute('V',model)
 
-    def setPolicy(self,policy,model=None,level=None):
-        self.setAttribute('policy',policy.desymbolize(self.world.symbols),model,level)
+    def setPolicy(self,policy,model=None):
+        self.setAttribute('policy',policy.desymbolize(self.world.symbols),model)
 
-    def setHorizon(self,horizon,model=None,level=None):
+    def setHorizon(self,horizon,model=None):
         """
         :type horizon: int
         :param model: the model to set the horizon for, where ``None`` means set it for all (default is ``None``)
-        :param level: if setting across models, the recursive level of models to do so, where ``None`` means all levels (default is ``None``)
         """
-        self.setAttribute('horizon',horizon,model,level)
+        self.setAttribute('horizon',horizon,model)
 
-    def setParameter(self,name,value,model=None,level=None):
+    def setParameter(self,name,value,model=None):
         raise DeprecationWarning('Use setAttribute instead')
 
-    def setAttribute(self,name,value,model=None,level=None):
+    def setAttribute(self,name,value,model=None):
         """
         Set a parameter value for the given model(s)
         :param name: the feature of the model to set
         :type name: str
         :param value: the new value for the parameter
         :param model: the model to set the horizon for, where ``None`` means set it for all (default is ``None``)
-        :param level: if setting across models, the recursive level of models to do so, where ``None`` means all levels (default is ``None``)
         """
         if model is None:
             for model in self.models.values():
-                if level is None or model['level'] == level:
-                    self.setAttribute(name,value,model['name'])
+                self.setAttribute(name,value,model['name'])
         else:
             self.models[model][name] = value
 
@@ -878,7 +875,6 @@ class Agent(object):
          - R: the reward table for the agent under this model (default is ``True``), L{KeyedTree}S{->}float
          - beliefs: the beliefs the agent has under this model (default is ``True``), L{MatrixDistribution}
          - horizon: the horizon of the value function under this model (default is ``True``),int
-         - level: the recursive depth of this model (default is ``True``),int
          - rationality: the rationality parameter used in a quantal response function when modeling others (default is 10),float
          - discount: discount factor used in lookahead
          - selection: selection mechanism used in L{decide}
@@ -1081,11 +1077,7 @@ class Agent(object):
         return beliefs
         
     def setRecursiveLevel(self,level,model=None):
-        if model is None:
-            for model in self.models.values():
-                model['level'] = level
-        else:
-            self.models[model]['level'] = level
+        raise DeprecationWarning('Setting level of recursion is no longer supported. Explicitly specify what the nested mental models are.')
 
     def setBelief(self,key,distribution,model=None,state=None):
         if state is None:
