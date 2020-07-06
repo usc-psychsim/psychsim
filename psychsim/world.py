@@ -305,7 +305,13 @@ class World(object):
                             # We are selecting a specific value, just not for this particular state feature
                             tree = tree.sample(False,None if isinstance(state,VectorDistributionSet) else state)
                         state *= tree
-    #                    state.__imul__(tree,True)
+                        if isinstance(select,dict) and key in select:
+                            if select[key] not in state.marginal(makeFuture(key)):
+                                raise ValueError('Selecting impossible value "%s" for %s (nonzero probability for %s)' % \
+                                    (self.float2value(key,select[key]),key,
+                                        ', '.join(['"%s"' % (self.value2float(key,el)) 
+                                            for el in state.marginal(makeFuture(key)).domain()])))
+                            state[makeFuture(key)] = select[key]
                     else:
                         try:
                             state *= tree
@@ -602,7 +608,9 @@ class World(object):
         """
         if dynamics is None:
             dynamics = {}
-        if isinstance(joint,ActionSet):
+        if isinstance(joint,Action):
+            return self.getActionEffects(ActionSet(joint),keySet,dynamics)
+        elif isinstance(joint,ActionSet):
             for key,tree in self.dynamics[joint].items():
                 if key in keySet:
                     try:
