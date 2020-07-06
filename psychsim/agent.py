@@ -939,6 +939,26 @@ class Agent(object):
             choices = Distribution(V,rationality)
         return choices
 
+    def expectation(self,other,model=None,state=None):
+        """
+        :return: what I expect this other agent to do
+        """
+        if state is None:
+            state = self.world.state
+        if model is None:
+            models = self.world.getModel(self.name).domain()
+        elif isinstance(model,str):
+            models = [model]
+        result = {}
+        for myModel in models:
+            result[myModel] = {}
+            beliefs = self.models[myModel]['beliefs']
+            dist = self.world.getFeature(modelKey(other),beliefs)
+            for yrModel in dist.domain():
+                result[myModel][yrModel] = {'probability': dist[yrModel]}
+                result[myModel][yrModel]['decision'] = self.world.agents[other].decide(state,model=yrModel)
+        return result
+
     def model2index(self,model):
         """
         Convert a model name to a numeric representation
