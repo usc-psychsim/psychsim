@@ -266,6 +266,10 @@ class World(object):
         return dynamics
 
     def applyEffect(self,state,effect,select=False):
+        if isinstance(select,dict):
+            default_select = select.get('__default__',True)
+        else:
+            default_select = select
         if isinstance(effect,list):
             for stage in effect:
                 state = self.applyEffect(state,stage,select)
@@ -301,7 +305,7 @@ class World(object):
                             tree = tree.sample(True,None if isinstance(state,VectorDistributionSet) else state)
                         elif select is True:
                             tree = tree.sample(False,None if isinstance(state,VectorDistributionSet) else state)
-                        elif key not in select:
+                        elif default_select and key not in select:
                             # We are selecting a specific value, just not for this particular state feature
                             tree = tree.sample(False,None if isinstance(state,VectorDistributionSet) else state)
                         state *= tree
