@@ -309,7 +309,7 @@ class World(object):
                             if select[key] not in state.marginal(makeFuture(key)):
                                 raise ValueError('Selecting impossible value "%s" for %s (nonzero probability for %s)' % \
                                     (self.float2value(key,select[key]),key,
-                                        ', '.join(['"%s"' % (self.value2float(key,el)) 
+                                        ', '.join(['"%s"' % (self.float2value(key,el)) 
                                             for el in state.marginal(makeFuture(key)).domain()])))
                             state[makeFuture(key)] = select[key]
                     else:
