@@ -1129,7 +1129,7 @@ class World(object):
         else:
             marginal = state.marginal(key)
             if unique:
-                assert len(marginal) == 1,'Unique value requested for %s, but uncertain value exists' % (key)
+                assert len(marginal) == 1,'Unique value requested for %s, but number of values is %d' % (key, len(marginal))
                 return self.float2value(key,marginal).first()
             else:
                 return self.float2value(key,marginal)
