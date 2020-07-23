@@ -266,6 +266,10 @@ class World(object):
         return dynamics
 
     def applyEffect(self,state,effect,select=False):
+        if isinstance(select,dict):
+            default_select = select.get('__default__',True)
+        else:
+            default_select = select
         if isinstance(effect,list):
             for stage in effect:
                 state = self.applyEffect(state,stage,select)
@@ -301,7 +305,7 @@ class World(object):
                             tree = tree.sample(True,None if isinstance(state,VectorDistributionSet) else state)
                         elif select is True:
                             tree = tree.sample(False,None if isinstance(state,VectorDistributionSet) else state)
-                        elif key not in select:
+                        elif default_select and key not in select:
                             # We are selecting a specific value, just not for this particular state feature
                             tree = tree.sample(False,None if isinstance(state,VectorDistributionSet) else state)
                         state *= tree
@@ -309,7 +313,7 @@ class World(object):
                             if select[key] not in state.marginal(makeFuture(key)):
                                 raise ValueError('Selecting impossible value "%s" for %s (nonzero probability for %s)' % \
                                     (self.float2value(key,select[key]),key,
-                                        ', '.join(['"%s"' % (self.value2float(key,el)) 
+                                        ', '.join(['"%s"' % (self.float2value(key,el)) 
                                             for el in state.marginal(makeFuture(key)).domain()])))
                             state[makeFuture(key)] = select[key]
                     else:
@@ -1125,7 +1129,7 @@ class World(object):
         else:
             marginal = state.marginal(key)
             if unique:
-                assert len(marginal) == 1,'Unique value requested for %s, but uncertain value exists' % (key)
+                assert len(marginal) == 1,'Unique value requested for %s, but number of values is %d' % (key, len(marginal))
                 return self.float2value(key,marginal).first()
             else:
                 return self.float2value(key,marginal)
