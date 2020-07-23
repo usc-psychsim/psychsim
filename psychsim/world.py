@@ -322,15 +322,15 @@ class World(object):
                         except KeyError:
                             print('Applying effect on %s' % (key))
                             print('Effect tree is\n%s' % (tree))
-                            print('State contains only: %s' % (sorted(state.keys())))
-                            if isinstance(state,KeyedVector):
-                                self.printVector(state)
-                            elif isinstance(state,VectorDistributionSet):
-                                self.printState(state)
-                            else:
-                                for vec in state.domain():
-                                    print(state[vec])
-                                    self.printVector(vec)
+#                            print('State contains only: %s' % (sorted(state.keys())))
+#                            if isinstance(state,KeyedVector):
+#                                self.printVector(state)
+#                            elif isinstance(state,VectorDistributionSet):
+#                                self.printState(state)
+#                            else:
+#                                for vec in state.domain():
+#                                    print(state[vec])
+#                                    self.printVector(vec)
                             raise
                 else:
                     cumulative = None
