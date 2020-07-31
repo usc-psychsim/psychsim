@@ -348,7 +348,7 @@ class Agent(object):
             if action:
                 start[self.name] = action
             for t in range(horizon):
-                logging.debug('Time %d/%d' % (t+1,horizon))
+                logging.debug('%s: Time %d/%d' % (model,t+1,horizon))
                 turn = self.world.next(current)
                 actions = {}
                 for name in turn:
@@ -1281,26 +1281,49 @@ class Agent(object):
                     # Get old belief state.
                     beliefs = copy.deepcopy(original)
                     # Project direct effect of the actions, including possible observations
-                    select = {o: omega[i] for i,o in enumerate(self.omega)}
-                    select['__default__'] = False
                     outcome = self.world.step({self.name: myAction} if myAction else None,beliefs,
-                        keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=True,select=select)
-                    # Create model with these new beliefs
-                    # TODO: Look for matching model?
-                    for dist in beliefs.distributions.values():
-                        if len(dist) > 1:
-                            deletion = False
-                            for vec in dist.domain():
-                                if dist[vec] < self.epsilon:
-                                    del dist[vec]
-                                    deletion = True
-                            if deletion:
-                                dist.normalize()
-                    newModel = self.belief2model(oldModel,beliefs)['name']
-                    SE[omega][myAction][horizon] = newModel
-                    if oldModelKey in self.omega:
-                        # Observe this new model
-                        self.world.setFeature(oldModelKey,newModel,beliefs)
+                        keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=True)
+                    # Condition on actual observations
+                    for o in self.omega:
+                        if o not in beliefs:
+                            raise ValueError('Observable variable %s missing from beliefs of %s' % (o,self.name))
+                        value = vector[o]
+                        for b in beliefs.distributions[beliefs.keyMap[o]].domain():
+                            if b[o] == value:
+                                break
+                        else:
+                            if o == oldModelKey:
+                                continue
+                            else:
+                                newModel = None
+                                logging.warning('%s (model %s) has impossible observation %s=%s when doing %s' % \
+                                              (self.name,oldModel,o,self.world.float2value(o,vector[o]),myAction))
+                                logging.warning('Possible observations are: %s' % (self.world.float2value(o,beliefs[o])))
+                                if o in self.world.dynamics and myAction in self.world.dynamics[o]:
+                                    logging.warning('Action effect is:\n%s' % (self.world.dynamics[o][myAction]))
+                                    logging.warning('Believed values are:\n%s' % ('\n'.join(['\t%s: %s' % (k,self.world.getFeature(k,original))
+                                        for k in self.world.dynamics[o][myAction].getKeysIn() if k !=CONSTANT])))
+                                    logging.warning('Original values are:\n%s' % ('\n'.join(['\t%s: %s (%d)' % (k,self.world.getFeature(k,vector),vector[k])
+                                        for k in self.world.dynamics[o][myAction].getKeysIn() if k !=CONSTANT and k in vector])))
+                                break
+                        beliefs[o] = vector[o]
+                    else:
+                        # Create model with these new beliefs
+                        # TODO: Look for matching model?
+                        for dist in beliefs.distributions.values():
+                            if len(dist) > 1:
+                                deletion = False
+                                for vec in dist.domain():
+                                    if dist[vec] < self.epsilon:
+                                        del dist[vec]
+                                        deletion = True
+                                if deletion:
+                                    dist.normalize()
+                        newModel = self.belief2model(oldModel,beliefs)['name']
+                        SE[omega][myAction][horizon] = newModel
+                        if oldModelKey in self.omega:
+                            # Observe this new model
+                            self.world.setFeature(oldModelKey,newModel,beliefs)
             # Insert new model into true state
             if isinstance(newModel,str):
                 vector[newModelKey] = self.world.value2float(oldModelKey,newModel)
