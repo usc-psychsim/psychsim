@@ -192,26 +192,26 @@ class Agent(object):
             tree = None
             myAction = keys.stateKey(self.name,keys.ACTION)
             myModel = keys.modelKey(self.name)
-            for submodel in model.domain():
+            modelValues = list(model.domain())
+            tree = {}
+            for index,submodel in enumerate(modelValues):
                 result[submodel] = self.decide(state,horizon,others,submodel,
                                                selection,actions,keySet)
                 if isinstance(result[submodel]['action'],Distribution):
                     if len(result[submodel]['action']) > 1:
-                        matrix = {'distribution': [(setToConstantMatrix(myAction,el),
+                        tree[index] = {'distribution': [(setToConstantMatrix(myAction,el),
                                                     result[submodel]['action'][el]) \
                                                    for el in result[submodel]['action'].domain()]}
                     else:
                         # Distribution with 100% certainty
-                        matrix = setToConstantMatrix(myAction,result[submodel]['action'].first())
+                        tree[index] = setToConstantMatrix(myAction,result[submodel]['action'].first())
                 else:
-                    matrix = setToConstantMatrix(myAction,result[submodel]['action'])
-                if tree is None:
-                    # Assume it's this model (?)
-                    tree = matrix
-                else:
-                    plane = equalRow(myModel,submodel)
-                    tree = {'if': plane, True: matrix,False: tree}
-            result['policy'] = makeTree(tree)
+                    tree[index] = setToConstantMatrix(myAction,result[submodel]['action'])
+            if len(modelValues) == 1:
+                result['policy'] = makeTree(tree[0])
+            else:
+                tree['if'] = equalRow(myModel,[self.models[submodel]['index'] for submodel in modelValues])
+                result['policy'] = makeTree(tree)
             return result
         if selection is None:
             selection = self.getAttribute('selection',model)
