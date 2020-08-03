@@ -500,7 +500,7 @@ class VectorDistributionSet:
                             distribution = newKids[index].distributions[substate]
                             for vector in distribution.domain():
                                 self.distributions[mySubstate].addProb(vector,distribution[vector]*prob)
-            else:
+            elif len(other.branch.planes) == 1 or other.branch.isConjunction:
                 # Evaluate the hyperplane and split the state
                 branchKeys = set(other.branch.keys())-{keys.CONSTANT}
                 substates = self.substate(branchKeys)
@@ -508,47 +508,54 @@ class VectorDistributionSet:
                     valSub = self.collapse(substates,False)
                 else:
                     valSub = None
-                assert len(other.branch.planes) == 1,'Currently unable to process conjunctive branches'
                 if valSub is None:
                     vector = KeyedVector({k: self.distributions[self.keyMap[k]].first()[k] \
                                           for k in branchKeys})
                     vector[keys.CONSTANT] = 1
                     self *= other.children[other.branch.evaluate(vector)]
                 else:
-                    assert len(other.branch.planes) == 1,'Unable to multiply by joint planes'
                     # Apply the test to this tree
-                    self *= other.branch.planes[0][0]
-                    valSub = self.keyMap[keys.VALUE]
-                    states = {}
-                    del self.keyMap[keys.VALUE]
-                    # Iterate through possible test results
-                    for vector in self.distributions[valSub].domain():
-                        prob = self.distributions[valSub][vector]
-                        del self.distributions[valSub][vector]
-                        test = other.branch.evaluate(vector[keys.VALUE])
-                        del vector[keys.VALUE]
-                        if test not in states:
-                            if states:
-                                states[test] = copy.deepcopy(self)
-                                states[test].distributions[valSub].clear()
+                    result = {}
+                    for planeIndex,plane in enumerate(other.branch.planes):
+                        if result and children == {False}:
+                            # Already eliminated any possibility of being True
+                            break
+                        self *= plane[0]
+                        valSub = self.keyMap[keys.VALUE]
+                        children = set()
+                        del self.keyMap[keys.VALUE]
+                        # Iterate through possible test results
+                        for vector in self.distributions[valSub].domain():
+                            prob = self.distributions[valSub][vector]
+                            del self.distributions[valSub][vector]
+                            value = vector[keys.VALUE]
+                            del vector[keys.VALUE]
+                            test = other.branch.evaluate(value,planeIndex)
+                            if result:
+                                test = result[vector] and test
+                            if len(other.branch.planes) > 1:
+                                result[vector] = test
+                            children.add(test)
+                            if len(vector) > 1:
+                                states[test].distributions[valSub].addProb(vector,prob)
+                        if len(children) == 0:
+                            raise ValueError('Empty result of multiplication')
+                        if len(self.distributions[valSub].domain()) == 0:
+                            # Somehow only the value, and no other variables, were in this distribution?
+                            del self.distributions[valSub]
+                    states = [copy.deepcopy(self) for i in range(len(children)-1)]
+                    for state in states:
+                        state.distributions[valSub].clear()
+                    for i,test in enumerate(children):
+                        if test not in other.children:
+                            if test is None:
+                                logging.error('Missing fallback branch in tree:\n%s' % (str(other)))
                             else:
-                                states[test] = self
-                                first = test
-                        if len(vector) > 1:
-                            states[test].distributions[valSub].addProb(vector,prob)
-                    assert states,'Empty result of multiplication'
-                    if len(self.distributions[valSub].domain()) == 0:
-                        del self.distributions[valSub]
-                    if first not in other.children:
-                        if first is None:
-                            logging.error('Missing fallback branch in tree:\n%s' % (str(other)))
+                                logging.error('Missing branch for value %s in tree:\n%s' % (test,str(other)))
+                        if i == 0:
+                            self *= other.children[test]
                         else:
-                            logging.error('Missing branch for value %s in tree:\n%s' % (first,str(other)))
-                    self *= other.children[first]
-                    for key in other.getKeysOut():
-                        assert key in self.keyMap
-                    for test,state in states.items():
-                        if state is not self:
+                            state = states[i-1]
                             newKeys = set(other.getKeysOut())
                             assert len(state.distributions[valSub].domain()) > 0
                             state *= other.children[test]
@@ -556,6 +563,8 @@ class VectorDistributionSet:
                             if substates:
                                 newSub = state.collapse(substates,False)
                             newSub = self.update(state,newKeys|branchKeys)
+            else:
+                raise NotImplementedError('Unable to process disjunctive conditionals')
         elif isinstance(other,KeyedVector):
             substates = self.substate(other)
             self.collapse(substates)

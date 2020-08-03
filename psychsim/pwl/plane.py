@@ -104,14 +104,20 @@ class KeyedPlane:
             else:
                 raise NotImplementedError('Not yet handling comparisons other than >, but it is really easy to do')
 
-    def evaluate(self,vector):
+    def evaluate(self,vector,index=None):
         """
         Tests whether the given vector passes or fails this test.
         Also accepts a numeric value, in lieu of doing a dot product.
+        :param index: evaluate against only the given plane (not all of them in case this is a con/disjunctive branch)
+        :type index: int
         :rtype: bool
         :warning: If multiple planes are present, an AND over their results is assumed
         """
         result = None
+        if index is None:
+            planes = self.planes
+        else:
+            planes = [self.planes[index]]
         for plane,threshold,comparison in self.planes:
             if isinstance(vector,float):
                 total = vector
