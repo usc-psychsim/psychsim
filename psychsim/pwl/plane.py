@@ -121,14 +121,13 @@ class KeyedPlane:
                 assert len(total) == 1,'Unable to handle uncertain test results'
                 total = total.first()
             if comparison > 0:
-                value = total+plane.epsilon
                 if isinstance(threshold,list):
                     for index in range(len(threshold)):
-                        if value <= threshold[index]:
+                        if total <= threshold[index]:
                             return index
                     else:
                         return len(threshold)
-                elif value > threshold:
+                elif total > threshold:
                     if not self.isConjunction:
                         # Disjunction, so any positive result is sufficient
                         return True
@@ -136,14 +135,13 @@ class KeyedPlane:
                     # Conjunction, so any negative result is sufficient
                     return False
             elif comparison < 0:
-                value = total-plane.epsilon
                 if isinstance(threshold,list):
                     for index in range(len(threshold)):
-                        if value < threshold[index]:
+                        if total < threshold[index]:
                             return index
                     else:
                         return len(threshold)
-                elif value  < threshold:
+                elif total  < threshold:
                     if not self.isConjunction:
                         # Disjunction, so any positive result is sufficient
                         return True
