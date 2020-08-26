@@ -465,6 +465,7 @@ class VectorDistribution(Distribution):
         return self
 
     def prune(self,probThreshold,true=None):
+        change = False
         for vec in self.domain():
             if self[vec] < probThreshold:
                 if true:
@@ -474,8 +475,10 @@ class VectorDistribution(Distribution):
                     else:
                         # Has the true state, so don't delete
                         continue
+                change = True
                 del self[vec]
-        self.normalize()
+        if change:
+            self.normalize()
                 
     def __deepcopy__(self,memo):
         result = self.__class__({})

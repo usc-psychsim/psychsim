@@ -129,7 +129,7 @@ class World(object):
     """------------------"""
                 
     def step(self,actions=None,state=None,real=True,select=False,keySubset=None,
-             horizon=None,tiebreak=None,updateBeliefs=True,debug={}):
+             horizon=None,tiebreak=None,updateBeliefs=True,debug={},threshold=None):
         """
         The simulation method
         :param actions: optional argument setting a subset of actions to be performed in this turn
@@ -138,6 +138,7 @@ class World(object):
         :type state: L{VectorDistribution}
         :param real: if C{True}, then modify the given state; otherwise, this is only hypothetical (default is C{True})
         :type real: bool
+        :param float threshold: Outcomes with a likelihood below this threshold are pruned (default is None, no pruning)
         """
         if state is None:
             state = self.state
@@ -176,6 +177,8 @@ class World(object):
 
         if select:
             state.select(select=='max')
+        if threshold is not None:
+            state.prune(threshold)
         if self.memory:
             self.history.append(copy.deepcopy(state))
            # self.modelGC(False)

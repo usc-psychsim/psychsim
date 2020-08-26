@@ -332,6 +332,10 @@ class VectorDistributionSet:
         self.distributions.clear()
         self.keyMap.clear()
 
+    def prune(self,threshold):
+        for dist in self.distributions.values():
+            dist.prune(threshold)
+            
     def update(self,other,keySet,scale=1):
         # Anyone else mixed up in this?
         toMerge = set(keySet)
