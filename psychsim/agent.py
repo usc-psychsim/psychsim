@@ -34,6 +34,7 @@ class Agent(object):
     :type y: int
     :ivar color: color name to be used in UI
     :type color: str
+    :ivar float belief_threshold: belief-update outcomes that have a likelihood belief this threshold are pruned (default is None, which means no pruning)
     """
 
     def __init__(self,name,world=None):
@@ -55,6 +56,8 @@ class Agent(object):
             self.name = name
         self.parallel = False
         self.epsilon = 1e-6
+
+        self.belief_threshold = None
 
     """------------------"""
     """Policy methods"""
@@ -1333,7 +1336,7 @@ class Agent(object):
         newDist.normalize()
         change = False
         for vec in newDist.domain():
-            if newDist[vec] < 1e-8:
+            if self.belief_threshold is not None and newDist[vec] < self.belief_threshold:
                 del newDist[vec]
                 change = True
         if change:
