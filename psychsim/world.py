@@ -426,8 +426,6 @@ class World(object):
         else:
             self.agents[agent.name] = agent
             agent.world = self
-            self.turnSubstate = None
-            self.turnKeys = set()
             key = modelKey(agent.name)
             if not key in self.variables:
                 self.defineVariable(key,list,list(agent.models.keys()))
