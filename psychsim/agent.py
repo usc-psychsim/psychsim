@@ -908,13 +908,14 @@ class Agent(object):
             self.world.variables[modelKey(self.name)]['elements'].append(name)
         return model
 
-    def get_true_model(self):
+    def get_true_model(self,unique=True):
         """
         :return: the name of the "true" model of this agent, i.e., the model by which the real agent is governed in the real world
         :rtype: str
-        :warning: Assumes that there is a unique true model
+        :param unique: If True, assume there is a unique true model (default is True)
+        :type unique: bool
         """
-        return self.world.getModel(self.name,unique=True)
+        return self.world.getModel(self.name,unique=unique)
 
     def deleteModel(self,name):
         """
