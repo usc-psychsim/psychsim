@@ -1,10 +1,11 @@
 import math
+import sys
 from xml.dom.minidom import Document,Node
 
 class Distribution(dict):
     """
     A probability distribution over hashable objects
-    
+
     .. warning:: If you make the domain values mutable types, try not to change their values while they are inside the distribution.  If you must change a domain value, it is better to first delete the old value, change it, and then re-insert it.
     """
     epsilon = 1e-8
@@ -13,7 +14,7 @@ class Distribution(dict):
         obj = dict.__new__(cls)
         obj._domain = {}
         return obj
-        
+
     def __init__(self,args=None,rationality=None):
         """
         :param args: the initial elements of the probability distribution
@@ -37,7 +38,11 @@ class Distribution(dict):
             else:
                 # Do quantal response / softmax on table of values
                 for key,V in args.items():
-                    self[key] = math.exp(rationality*V)
+                    try:
+                        self[key] = math.exp(rationality*V)
+                    except:
+                        #if the exponent is too big, then just set the value to the system max float value
+                        self[key] = sys.float_info[0]
                 self.normalize()
 
     def first(self):
@@ -49,11 +54,11 @@ class Distribution(dict):
     def get(self,element):
         key = hash(element)
         return dict.get(self,key,0.)
-    
+
     def __getitem__(self,element):
         key = hash(element)
         return dict.__getitem__(self,key)
-        
+
     def __setitem__(self,element,value):
         """
         :param element: the domain element
@@ -107,7 +112,7 @@ class Distribution(dict):
         prob = self[old]
         del self[old]
         self[new] = prob
-        
+
     def domain(self):
         """
         :returns: the sample space of this probability distribution
@@ -125,7 +130,7 @@ class Distribution(dict):
                     self[key] /= total
                 except ZeroDivisionError:
                     self[key] = 1./float(len(self))
-    
+
     def expectation(self):
         """
         :returns: the expected value of this distribution
@@ -145,7 +150,7 @@ class Distribution(dict):
 
     def __float__(self):
         return self.expectation()
-        
+
     def sample(self,quantify=False):
         """
         :param quantify: if ``True``, also returns the amount of mass by which the sampling crosssed the threshold of the generated sample's range
@@ -231,7 +236,7 @@ class Distribution(dict):
             for element in self.domain():
                 result.addProb(element*other,self[element])
             return result
-        
+
     def prune(self,epsilon=1e-8):
         elements = self.domain()
         i = 0
@@ -267,7 +272,7 @@ class Distribution(dict):
             else:
                 node.appendChild(self.element2xml(value))
         return doc
-        
+
     def element2xml(self,value):
         raise NotImplementedError('Unable to generate XML for distributions over %s' % (value.__class__.__name__))
 
@@ -317,7 +322,7 @@ class Distribution(dict):
 
     def __getstate__(self):
         return {el: self[el] for el in self.domain()}
-    
+
     def __setstate__(self,state):
         self.clear()
         for el,prob in state.items():
