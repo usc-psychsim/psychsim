@@ -19,7 +19,7 @@ class Distribution(dict):
         """
         :param args: the initial elements of the probability distribution
         :type args: dict
-        :param rationality: if not ``None``, then use as a rationality parameter in a quantal response over the provided values
+        :param rationality: if not ``None``, then use as a rationality parameter in a quantal response (or inverse of temperature in a Bernoulli distribution) over the provided values
         :type rationality: float
         """
         dict.__init__(self)
