@@ -11,7 +11,7 @@ setuptools.setup(
     description="PsychSim is an open-source social-simulation framework using decision-theoretic agents who have a theory of mind",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/usc-psychsim/atomic",
+    url="https://github.com/usc-psychsim/psychsim",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
