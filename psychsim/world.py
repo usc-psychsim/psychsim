@@ -1474,6 +1474,27 @@ class World(object):
             raise DeprecationWarning('Use key when calling getDescription, not entity/feature combination.')
         return self.variables[key]['description']
 
+    def audit(self):
+        """
+        Pre-flight simulation check
+        """
+        errors = []
+        for agent in self.agents.values():
+            for model in agent.models.values():
+                if 'beliefs' in model:
+                    # Verify that I have correct beliefs about myself
+                    if modelKey(agent.name) in model['beliefs']:
+                        belief = self.getFeature(modelKey(agent.name), model['beliefs'])
+                        if len(belief) > 1:
+                            errors.append('Agent {} has uncertain belief about itself under model {}'.format(agent.name, model['name']))
+                        else:
+                            if self.getFeature(modelKey(agent.name), model['beliefs'], unique=True) != model['name']:
+                                errors.append('Agent {} has incorrect belief about itself under model {}'.format(agent.name, model['name']))
+                    else:
+                        errors.append('Agent {} has no belief about itself under model {}'.format(agent.name, model['name']))
+        if errors:
+            raise UserWarning('\n'.join(errors))
+
     """---------------------"""
     """Visualization methods"""
     """---------------------"""
@@ -1775,268 +1796,6 @@ class World(object):
     """---------------------"""
     """Serialization methods"""
     """---------------------"""
-
-    def __xml__(self):
-        doc = Document()
-        root = doc.createElement('world')
-        if not self.maxTurn is None:
-            root.setAttribute('maxTurn','%d' % (self.maxTurn))
-        doc.appendChild(root)
-        # Agents
-        for agent in self.agents.values():
-            root.appendChild(agent.__xml__().documentElement)
-        # State vector definitions
-        node = doc.createElement('state')
-        node.appendChild(self.state.__xml__().documentElement)
-        root.appendChild(node)
-        for key,entry in self.variables.items():
-            subnode = doc.createElement('feature')
-            subnode.setAttribute('name',key)
-            subnode.setAttribute('domain',entry['domain'].__name__)
-            for coord in ['xpre','ypre','xpost','ypost']:
-                if coord in entry:
-                    subnode.setAttribute(coord,str(entry[coord]))
-            if not entry['lo'] is None:
-                subnode.setAttribute('lo',str(entry['lo']))
-            if not entry['hi'] is None:
-                subnode.setAttribute('hi',str(entry['hi']))
-            if entry['domain'] is list or entry['domain'] is set:
-                for element in entry['elements']:
-                    subsubnode = doc.createElement('element')
-                    subsubnode.appendChild(doc.createTextNode(element))
-                    subnode.appendChild(subsubnode)
-            elif entry['domain'] is ActionSet:
-                for element in entry['elements']:
-                    subsubnode = doc.createElement('element')
-                    subsubnode.appendChild(element.__xml__().documentElement)
-                    subnode.appendChild(subsubnode)
-            if entry['description']:
-                subsubnode = doc.createElement('description')
-                subsubnode.appendChild(doc.createTextNode(entry['description']))
-                subnode.appendChild(subsubnode)
-            if entry['combinator']:
-                subnode.setAttribute('combinator',str(entry['combinator']))
-            node.appendChild(subnode)
-        # Local/global state
-        for entity,table in self.locals.items():
-            for feature,entry in table.items():
-                subnode = doc.createElement('local')
-                subnode.appendChild(doc.createTextNode(feature))
-                if entity:
-                    subnode.setAttribute('entity',entity)
-                node.appendChild(subnode)
-        # Relationships
-        for link,table in self.relations.items():
-            node = doc.createElement('relation')
-            node.setAttribute('name',link)
-            for key,entry in table.items():
-                subnode = doc.createElement('link')
-                subnode.setAttribute('subject',entry['subject'])
-                subnode.setAttribute('object',entry['object'])
-                node.appendChild(subnode)
-            root.appendChild(node)
-        # Dynamics
-        node = doc.createElement('dynamics')
-        for key,table in self.dynamics.items():
-            subnode = doc.createElement('table')
-            subnode.setAttribute('key',key)
-            if isinstance(table,dict):
-                for action,tree, in table.items():
-                    if not action is True:
-                        subnode.appendChild(action.__xml__().documentElement)
-                    subnode.appendChild(tree.__xml__().documentElement)
-            node.appendChild(subnode)
-        root.appendChild(node)
-        # Termination conditions
-        for termination in self.termination:
-            node = doc.createElement('termination')
-            node.appendChild(termination.__xml__().documentElement)
-            root.appendChild(node)
-        # Global symbol table
-        for symbol in self.symbolList:
-            node = doc.createElement('symbol')
-            if isinstance(symbol,str):
-                node.appendChild(doc.createTextNode(symbol))
-            elif isinstance(symbol,ActionSet):
-                node.appendChild(symbol.__xml__().documentElement)
-            else:
-                raise TypeError('Unknown symbol of type: %s' % (symbol.__class__.__name__))
-            root.appendChild(node)
-        # Event history
-        node = doc.createElement('history')
-        for entry in self.history:
-            node.appendChild(entry.__xml__().documentElement)
-        #     subnode = doc.createElement('entry')
-        #     for outcome in entry:
-        #         subsubnode = doc.createElement('outcome')
-        #         for name in self.agents.keys():
-        #             if 'actions' in outcome and name in outcome['actions']:
-        #                 subsubnode.appendChild(outcome['actions'][name].__xml__().documentElement)
-        # #        if 'delta' in outcome:
-        # #            subsubnode.appendChild(outcome['delta'].__xml__().documentElement)
-        #         subsubnode.appendChild(outcome['old'].__xml__().documentElement)
-        #         subnode.appendChild(subsubnode)
-        #     node.appendChild(subnode)
-        root.appendChild(node)
-        # UI Diagram
-        if self.diagram:
-            if isinstance(self.diagram,Node):
-                # We never bothered parsing this, so easy
-                root.appendChild(self.diagram)
-            else:
-                root.appendChild(self.diagram.__xml__().documentElement)
-        return doc
-
-    def parse(self,element,agentClass=Agent):
-        self.initialize()
-        try:
-            self.maxTurn = int(element.getAttribute('maxTurn'))
-        except ValueError:
-            self.maxTurn = None
-        node = element.firstChild
-        order = {}
-        agents = []
-        while node:
-            if node.nodeType == node.ELEMENT_NODE:
-                if node.tagName == 'agent':
-                    agents.append(node)
-                elif node.tagName == 'state':
-                    label = str(node.getAttribute('label'))
-                    if label:
-                        if label == 'None':
-                            label = None
-                    else:
-                        label = None
-                    subnode = node.firstChild
-                    while subnode:
-                        if subnode.nodeType == subnode.ELEMENT_NODE:
-                            if subnode.tagName == 'worlds':
-                                self.state = VectorDistributionSet(subnode)
-                            elif subnode.tagName == 'distribution':
-                                distribution = psychsim.pwl.VectorDistribution(subnode)
-                                for key in distribution.domain()[0].keys():
-                                    if key != CONSTANT:
-                                        print(key,label)
-                                        self.state.keyMap[key] = label
-                                self.state.distributions[label] = distribution
-                            elif subnode.tagName == 'feature':
-                                key = str(subnode.getAttribute('name'))
-                                domain,lo,hi,description,combinator = parseDomain(subnode)
-                                try:
-                                    substate = self.state.keyMap[key]
-                                except KeyError:
-                                    substate = None
-                                if isStateKey(key) and state2agent(key) is None:
-                                    key = stateKey(WORLD,key)
-                                self.defineVariable(key,domain,lo,hi,description,combinator,substate)
-                                try:
-                                    for coord in ['xpre','ypre','xpost','ypost']:
-                                        self.variables[key][coord] = int(subnode.getAttribute(coord))
-                                except ValueError:
-                                    pass
-                            elif subnode.tagName == 'local':
-                                entity = str(subnode.getAttribute('entity'))
-                                if not entity:
-                                    entity = WORLD
-                                feature = str(subnode.firstChild.data).strip()
-                                self.defineState(entity,feature,None)
-                        subnode = subnode.nextSibling
-                elif node.tagName == 'relation':
-                    name = str(node.getAttribute('name'))
-                    subnode = node.firstChild
-                    while subnode:
-                        if subnode.nodeType == subnode.ELEMENT_NODE:
-                            assert subnode.tagName == 'link'
-                            subj = str(subnode.getAttribute('subject'))
-                            obj = str(subnode.getAttribute('object'))
-                            self.defineRelation(subj,obj,name,None)
-                        subnode = subnode.nextSibling
-                elif node.tagName == 'dynamics':
-                    subnode = node.firstChild
-                    while subnode:
-                        if subnode.nodeType == subnode.ELEMENT_NODE:
-                            assert subnode.tagName == 'table'
-                            key = str(subnode.getAttribute('key'))
-                            self.dynamics[key] = {}
-                            subsubnode = subnode.firstChild
-                            action = True
-                            while subsubnode:
-                                if subsubnode.nodeType == subsubnode.ELEMENT_NODE:
-                                    if subsubnode.tagName == 'action':
-                                        assert action is True
-                                        action = Action(subsubnode)
-                                    elif subsubnode.tagName == 'option':
-                                        assert action is True
-                                        action = ActionSet(subsubnode)
-                                    elif subsubnode.tagName == 'tree':
-                                        self.dynamics[key][action] = psychsim.pwl.KeyedTree(subsubnode)
-                                        action = True
-                                    else:
-                                        raise NameError('Unknown dynamics element: %s' % (subsubnode.tagName))
-                                subsubnode = subsubnode.nextSibling
-                            if len(self.dynamics[key]) == 0:
-                                # Empty table
-                                self.dynamics[key] = True
-                        subnode = subnode.nextSibling
-                elif node.tagName == 'termination':
-                    subnode = node.firstChild
-                    while subnode and subnode.nodeType != subnode.ELEMENT_NODE:
-                        subnode = subnode.nextSibling
-                    if subnode:
-                        self.termination.append(psychsim.pwl.KeyedTree(subnode))
-                elif node.tagName == 'symbol':
-                    symbol = str(node.firstChild.data)
-                    if not symbol.strip():
-                        subnode = node.firstChild
-                        while subnode and subnode.nodeType != subnode.ELEMENT_NODE:
-                            subnode = subnode.nextSibling
-                        if subnode:
-                            if subnode.tagName == 'option':
-                                symbol = ActionSet(subnode)
-                            else:
-                                raise ValueError('Unknown symbol tag: %s' % (subnode.tagName))
-                    self.symbolList.append(symbol)
-                elif node.tagName == 'history':
-                    subnode = node.firstChild
-                    while subnode:
-                        if subnode.nodeType == subnode.ELEMENT_NODE:
-                            assert subnode.tagName == 'entry'
-                            entry = []
-                            subsubnode = subnode.firstChild
-                            while subsubnode:
-                                if subsubnode.nodeType == subsubnode.ELEMENT_NODE:
-                                    assert subsubnode.tagName == 'outcome'
-                                    outcome = {'actions': {}}
-                                    element = subsubnode.firstChild
-                                    while element:
-                                        if element.nodeType == element.ELEMENT_NODE:
-                                            if element.tagName == 'option':
-                                                option = ActionSet(element)
-                                                for action in option:
-                                                    outcome['actions'][action['subject']] = option
-                                                    break
-                                            elif element.tagName == 'vector':
-                                                outcome['old'] = psychsim.pwl.KeyedVector(element)
-                                            elif element.tagName == 'distribution':
-                                                outcome['delta'] = psychsim.pwl.VectorDistribution(element)
-                                        element = element.nextSibling
-                                    entry.append(outcome)
-                                subsubnode = subsubnode.nextSibling
-                            self.history.append(entry)
-                        subnode = subnode.nextSibling
-                elif node.tagName == 'diagram':
-                    # UI information. Parse later
-                    self.diagram = Diagram(node)
-            node = node.nextSibling
-        self.symbolList = self.symbolList[int(len(self.symbolList)/2):]
-        for index in range(len(self.symbolList)):
-            self.symbols[self.symbolList[index]] = index
-        for node in agents:
-            if agentClass.isXML(node):
-                self.addAgent(agentClass(node,self),False)
-            else:
-                assert Agent.isXML(node)
-                self.addAgent(Agent(node),False)
         
     def save(self,filename):
         """
@@ -2048,55 +1807,6 @@ class World(object):
         with bz2.BZ2File(filename,'w') as f:
             pickle.dump(self,f)
         return filename
-
-def parseDomain(subnode):
-    varType = str(subnode.getAttribute('type'))
-    domain = str(subnode.getAttribute('domain'))
-    if not varType:
-        varType = domain
-    description = None
-    lo = str(subnode.getAttribute('lo'))
-    if not lo: lo = None
-    hi = str(subnode.getAttribute('hi'))
-    if not hi: hi = None
-    if varType == 'int':
-        varType = int
-        if lo: lo = int(lo)
-        if hi: hi = int(hi)
-    elif varType == 'float':
-        varType = float
-        if lo: lo = float(lo)
-        if hi: hi = float(hi)
-    elif varType == 'bool':
-        varType = bool
-    elif varType == 'list':
-        varType = list
-        lo = []
-    elif varType == 'set':
-        varType = set
-        lo = []
-    elif varType == 'ActionSet':
-        varType = ActionSet
-        lo = []
-    else:
-        raise TypeError('Unknown feature domain type: %s' % (varType))
-    combinator = str(subnode.getAttribute('combinator'))
-    if len(combinator) == 0:
-        combinator = None
-    subsubnode = subnode.firstChild
-    while subsubnode:
-        if subsubnode.nodeType == subsubnode.ELEMENT_NODE:
-            if subsubnode.tagName == 'element':
-                if varType is list or varType is set:
-                    lo.append(str(subsubnode.firstChild.data).strip())
-                else:
-                    assert varType is ActionSet
-                    lo.append(ActionSet(subsubnode.getElementsByTagName('action')))
-            else:
-                assert subsubnode.tagName == 'description'
-                description = str(subsubnode.firstChild.data).strip()
-        subsubnode = subsubnode.nextSibling
-    return varType,lo,hi,description,combinator
 
 def scaleValue(value,entry):
     """
