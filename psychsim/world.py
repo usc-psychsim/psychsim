@@ -1246,7 +1246,7 @@ class World(object):
                 distribution = {distribution: 1.}
             if not isinstance(distribution,psychsim.probability.Distribution):
                 distribution = psychsim.probability.Distribution(distribution)
-            distribution.normalize()
+#            distribution.normalize()
         key = modelKey(modelee)
         if isinstance(state,str):
             # This is the name of the modeling agent (*cough* hack *cough*)
