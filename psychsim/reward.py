@@ -20,3 +20,10 @@ def minimizeDifference(key1,key2,agent):
     return makeTree({'if': greaterThanRow(key1, key2),
                      True: dynamicsMatrix(rewardKey(agent),{key1: -1.,key2: 1.}),
                      False: dynamicsMatrix(rewardKey(agent),{key1: 1.,key2: -1.})})
+
+def null_reward(agent):
+    """
+    :return: a reward function that always returns 0
+    :type agent: str
+    """
+    return makeTree(setToConstantMatrix(rewardKey(agent), 0))
