@@ -271,7 +271,7 @@ class Agent(object):
                 b = copy.deepcopy(belief)
                 b *= Vfun[action]
                 V[action] = {'__EV__': b[rewardKey(self.name,True)].expectation()}
-                logging.debug('Evaluated %s (%d): %f' % (action,horizon,V[action]['__EV__']))
+                logging.debug('Evaluated %s as %s (%d): %f' % (action, model, horizon, V[action]['__EV__']))
         elif self.parallel:
             with multiprocessing.Pool() as pool:
                 results = [(action,pool.apply_async(self.value,
@@ -283,7 +283,7 @@ class Agent(object):
             V = {}
             for action in actions:
                 V[action] = self.value(belief,action,model,horizon,others,keySet)
-                logging.debug('Evaluated %s (%d): %f' % (action,horizon,V[action]['__EV__']))
+                logging.debug('Evaluated %s as %s (%d): %f' % (action, model, horizon,V[action]['__EV__']))
         best = None
         for action in actions:
             # Determine whether this action is the best
@@ -822,6 +822,8 @@ class Agent(object):
                 tree = makeTree(tree).desymbolize(self.world.symbols)
             else:
                 tree = self.getReward(model)
+            if tree is None:
+                raise ValueError('Agent "{} has no reward function defined (model "{}")'.format(self.name, model))
             vector *= tree
             if not rewardKey(self.name) in vector:
                 vector.join(rewardKey(self.name),0.)
@@ -895,7 +897,7 @@ class Agent(object):
             return self.models[name]
 #        if name in self.world.symbols:
 #            raise NameError('Model %s conflicts with existing symbol' % (name))
-        model = {'name': name,'index': 0,'parent': None,'SE': {},
+        model = {'name': name,'index': 0,'parent': None,'SE': {}, 'transition': {},
 #                 'V': ValueFunction(),
                  'policy': {},'ignore': []}
         model.update(kwargs)
@@ -1353,251 +1355,6 @@ class Agent(object):
             newDist.normalize()
         return trueState
 
-    """------------------"""
-    """Serialization methods"""
-    """------------------"""
-            
-    def __copy__(self):
-        return self.__class__(self.self.__xml__())
-
-    def __xml__(self):
-        doc = Document()
-        root = doc.createElement('agent')
-        doc.appendChild(root)
-        doc.documentElement.setAttribute('name',self.name)
-        if self.x:
-            doc.documentElement.setAttribute('x',str(self.x))
-            doc.documentElement.setAttribute('y',str(self.y))
-        if self.color:
-            doc.documentElement.setAttribute('color',self.color)
-        # Actions
-        node = doc.createElement('actions')
-        root.appendChild(node)
-        for action in self.actions:
-            node.appendChild(action.__xml__().documentElement)
-        # Conditions for legality of actions
-        for action,tree in self.legal.items():
-            node = doc.createElement('legal')
-            node.appendChild(action.__xml__().documentElement)
-            node.appendChild(tree.__xml__().documentElement)
-            root.appendChild(node)
-        # Observations
-        for omega in self.omega:
-            node = doc.createElement('omega')
-            node.appendChild(doc.createTextNode(omega))
-            root.appendChild(node)
-        if not self.O is True:
-            for key,table in self.O.items():
-                for actions,tree in table.items():
-                    node = doc.createElement('O')
-                    node.setAttribute('omega',key)
-                    if actions:
-                        node.appendChild(actions.__xml__().documentElement)
-                    node.appendChild(tree.__xml__().documentElement)
-                    root.appendChild(node)
-        # Models
-        for name,model in self.models.items():
-            node = doc.createElement('model')
-            node.setAttribute('name',str(name))
-            node.setAttribute('parent',str(model['parent']))
-            node.setAttribute('index',str(model['index']))
-            for key in filter(lambda k: not k in ['name','index','parent'],model.keys()):
-                if key == 'R':
-                    # Reward function for this model
-                    if model['R'] is True:
-                        subnode = doc.createElement(key)
-                        subnode.appendChild(doc.createTextNode(str(model[key])))
-                        node.appendChild(subnode)
-                    elif isinstance(model['R'],KeyedTree):
-                        subnode = doc.createElement(key)
-                        subnode.appendChild(model['R'].__xml__().documentElement)
-                        node.appendChild(subnode)
-                    else:
-                        for tree,weight in model['R'].items():
-                            subnode = doc.createElement(key)
-                            subnode.setAttribute('weight',str(weight))
-                            if isinstance(tree,str):
-                                # Goal on another agent
-                                subnode.setAttribute('name',str(tree))
-                            else:
-                                # PWL Goal
-                                subnode.appendChild(tree.__xml__().documentElement)
-                            node.appendChild(subnode)
-                elif key == 'V':
-                    if isinstance(model[key],ValueFunction):
-                        node.appendChild(model[key].__xml__().documentElement)
-                elif key == 'selection':
-                    node.setAttribute('selection',str(model[key]))
-                elif key == 'ignore':
-                    for key in model['ignore']:
-                        subnode = doc.createElement(key)
-                        subnode.appendChild(doc.createTextNode(key))
-                        node.appendChild(subnode)
-                elif key == 'policy':
-                    if model['policy']:
-                        subnode = doc.createElement(key)
-                        subnode.appendChild(model['policy'].__xml__().documentElement)
-                        node.appendChild(subnode)
-                elif key == 'beliefs':
-                    # Beliefs for this model
-                    if model['beliefs'] is True:
-                        subnode = doc.createElement(key)
-                        subnode.appendChild(doc.createTextNode(str(model[key])))
-                        node.appendChild(subnode)
-                    else:
-                        subnode = doc.createElement(key)
-                        subnode.appendChild(model['beliefs'].__xml__().documentElement)
-                        node.appendChild(subnode)
-                elif key == 'projector':
-                    subnode = doc.createElement(key)
-                    subnode.appendChild(doc.createTextNode(model[key].__name__))
-                    node.appendChild(subnode)
-                elif key == 'static':
-                    subnode = doc.createElement(key)
-                    subnode.setAttribute('value',str(model[key]))
-                    node.appendChild(subnode)
-                elif key == 'SE':
-                    # We don't serialize state estimator caching right now
-                    pass
-                else:
-                    subnode = doc.createElement(key)
-                    subnode.appendChild(doc.createTextNode(str(model[key])))
-                    node.appendChild(subnode)
-            root.appendChild(node)
-        return doc
-
-    def parse(self,element):
-        self.name = str(element.getAttribute('name'))
-        try:
-            self.x = int(element.getAttribute('x'))
-            self.y = int(element.getAttribute('y'))
-        except ValueError:
-            pass
-        self.color = str(element.getAttribute('color'))
-        node = element.firstChild
-        while node:
-            if node.nodeType == node.ELEMENT_NODE:
-                if node.tagName == 'actions':
-                    subnode = node.firstChild
-                    while subnode:
-                        if subnode.nodeType == subnode.ELEMENT_NODE:
-                            assert subnode.tagName == 'option'
-                            self.actions.add(ActionSet(subnode))
-                        subnode = subnode.nextSibling
-                elif node.tagName == 'omega':
-                    self.omega.add(str(node.firstChild.data).strip())
-                elif node.tagName == 'O':
-                    if self.O is True:
-                        self.O = {}
-                    omega = str(node.getAttribute('omega'))
-                    if not omega in self.O:
-                        self.O[omega] = {}
-                    action = None
-                    subnode = node.firstChild
-                    while subnode:
-                        if subnode.nodeType == subnode.ELEMENT_NODE:
-                            if subnode.tagName == 'option':
-                                action = ActionSet(subnode)
-                            elif subnode.tagName == 'tree':
-                                tree = KeyedTree(subnode)
-                        subnode = subnode.nextSibling
-                    self.O[omega][action] = tree
-                elif node.tagName == 'model':
-                    # Parse model name
-                    name = str(node.getAttribute('name'))
-                    if name == 'True':
-                        name = True
-                    # Parse parent
-                    parent = str(node.getAttribute('parent'))
-                    if not parent or parent == str(None):
-                        parent = None
-                    elif parent == 'True':
-                        parent = True
-                    kwargs = {'parent': parent}
-                    # Parse index
-                    try:
-                        kwargs['index'] = int(node.getAttribute('index'))
-                    except ValueError:
-                        pass
-                    # Parse children
-                    text = str(node.getAttribute('selection'))
-                    if text == str(True):
-                        kwargs['selection'] = True
-                    elif text:
-                        kwargs['selection'] = text
-                    subnode = node.firstChild
-                    while subnode:
-                        if subnode.nodeType == subnode.ELEMENT_NODE:
-                            key = str(subnode.tagName)
-                            if key == 'V':
-                                kwargs[key] = ValueFunction(subnode)
-                            elif key == 'static':
-                                kwargs[key] = (str(subnode.getAttribute('value')) == str(True))
-                            else:
-                                if key == 'R' and str(subnode.getAttribute('name')):
-                                    if not key in kwargs:
-                                        kwargs[key] = {}
-                                    # Goal on another agent's goals
-                                    agent = str(subnode.getAttribute('name'))
-                                    kwargs[key][agent] = float(subnode.getAttribute('weight'))
-                                # Parse component elements
-                                subchild = subnode.firstChild
-                                while subchild:
-                                    if subchild.nodeType == subchild.ELEMENT_NODE:
-                                        if key == 'R':
-                                            # PWL goal
-                                            tree = KeyedTree(subchild)
-                                            if not key in kwargs:
-                                                kwargs[key] = {}
-                                            if subnode.getAttribute('weight'):
-                                                kwargs[key][tree] = float(subnode.getAttribute('weight'))
-                                            else:
-                                                kwargs[key] = tree
-                                        elif key == 'policy':
-                                            kwargs[key] = KeyedTree(subchild)
-                                        elif key == 'beliefs':
-                                            kwargs[key] = VectorDistributionSet(subchild)
-                                        else:
-                                            raise NameError('Unknown element found when parsing model\'s %s' % (key))
-                                    elif subchild.nodeType == subchild.TEXT_NODE:
-                                        text = subchild.data.strip()
-                                        if text:
-                                            if key == 'ignore':
-                                                try:
-                                                    kwargs[key].append(text)
-                                                except KeyError:
-                                                    kwargs[key] = [text]
-                                            elif text == str(True):
-                                                kwargs[key] = True
-                                            elif key == 'horizon':
-                                                kwargs[key] = int(text)
-                                            elif key == 'projector':
-                                                kwargs[key] = eval('Distribution.%s' % (text))
-                                            else:
-                                                try:
-                                                    kwargs[key] = float(text)
-                                                except ValueError:
-                                                    raise ValueError('Unable to parse attribute %s of model %s'  % (key,name))
-                                    subchild = subchild.nextSibling
-                        subnode = subnode.nextSibling
-                    # Add new model
-                    self.addModel(name,**kwargs)
-                elif node.tagName == 'legal':
-                    subnode = node.firstChild
-                    while subnode:
-                        if subnode.nodeType == subnode.ELEMENT_NODE:
-                            if subnode.tagName == 'option':
-                                action = ActionSet(subnode)
-                            elif subnode.tagName == 'tree':
-                                tree = KeyedTree(subnode)
-                        subnode = subnode.nextSibling
-                    self.legal[action] = tree
-            node = node.nextSibling
-
-    @staticmethod
-    def isXML(element):
-        return element.tagName == 'agent'
-
 class ValueFunction:
     """
     Representation of an agent's value function, either from caching or explicit solution
@@ -1675,58 +1432,5 @@ class ValueFunction:
     def __lt__(self,other):
         return self.name < other.name
 
-    def __xml__(self):
-        doc = Document()
-        root = doc.createElement('V')
-        doc.appendChild(root)
-        for horizon in range(len(self.table)):
-            subnode = doc.createElement('table')
-            subnode.setAttribute('horizon',str(horizon))
-            for state,V_s in self.table[horizon].items():
-                subnode.appendChild(state.__xml__().documentElement)
-                for name,V_s_a in V_s.items():
-                    for action,V in V_s_a.items():
-                        subsubnode = doc.createElement('value')
-                        subsubnode.setAttribute('agent',name)
-                        if action:
-                            subsubnode.appendChild(action.__xml__().documentElement)
-                        subsubnode.appendChild(doc.createTextNode(str(V)))
-                        subnode.appendChild(subsubnode)
-            root.appendChild(subnode)
-        return doc
-
-    def parse(self,element):
-        assert element.tagName == 'V',element.tagName
-        del self.table[:]
-        node = element.firstChild
-        while node:
-            if node.nodeType == node.ELEMENT_NODE:
-                assert node.tagName == 'table',node.tagName
-                horizon = int(node.getAttribute('horizon'))
-                subnode = node.firstChild
-                while subnode:
-                    if subnode.nodeType == subnode.ELEMENT_NODE:
-                        if subnode.tagName == 'vector':
-                            state = KeyedVector(subnode)
-                        elif subnode.tagName == 'value':
-                            action = None
-                            agent = str(subnode.getAttribute('agent'))
-                            subsubnode = subnode.firstChild
-                            while subsubnode:
-                                if subsubnode.nodeType == subsubnode.ELEMENT_NODE:
-                                    if subsubnode.tagName == 'option':
-                                        actions = []
-                                        bottomNode = subsubnode.firstChild
-                                        while bottomNode:
-                                            if bottomNode.nodeType == bottomNode.ELEMENT_NODE:
-                                                actions.append(Action(bottomNode))
-                                            bottomNode = bottomNode.nextSibling
-                                        action = ActionSet(actions)
-                                elif subsubnode.nodeType == subsubnode.TEXT_NODE:
-                                    text = subsubnode.data.strip()
-                                    if text:
-                                        value = float(text)
-                                subsubnode = subsubnode.nextSibling
-                            self.set(agent,state,action,horizon,value)
-                    subnode = subnode.nextSibling
-            node = node.nextSibling
+def explain_decision(decision):
+    print(decision.keys())
