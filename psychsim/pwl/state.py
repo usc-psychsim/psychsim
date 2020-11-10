@@ -59,14 +59,18 @@ class VectorDistributionSet:
                 value.distributions[substate] = VectorDistribution({element: prob})
             yield value
 
-    def probability(self,vector):
+    def probability(self, vector=None):
         """
         :type vector: KeyedVector
-        :return: the probability of the given world according to this state distribution
+        :return: the probability of the given world according to this state distribution. If no world is given, then return the probability of the overall state
         """
         prob = 1
-        for key,value in vector.items():
-            prob *= self.marginal(key)[value]
+        if vector is None:
+            for distribution in self.distributions.values():
+                prob *= sum(distribution.values())
+        else:
+            for key,value in vector.items():
+                prob *= self.marginal(key)[value]
         return prob
 
     def __len__(self):
@@ -737,47 +741,16 @@ class VectorDistributionSet:
                     return False
                 remaining -= set(distributionMe.keys())
             return True
-        
-    def __xml__(self):
-        doc = Document()
-        root = doc.createElement('worlds')
-        doc.appendChild(root)
-        for label,distribution in self.distributions.items():
-            node = distribution.__xml__().documentElement
-            root.appendChild(node)
-            if not label is None:
-                node.setAttribute('label',str(label))
-        return doc
 
-    def parse(self,element):
-        self.keyMap.clear()
-        assert element.tagName == 'worlds'
-        node = element.firstChild
-        distributions = {}
-        while node:
-            if node.nodeType == node.ELEMENT_NODE:
-                distribution = VectorDistribution(node)
-                try:
-                    substate = int(node.getAttribute('label'))
-                    for key in distribution.keys():
-                        self.keyMap[key] = substate
-                    self.distributions[substate] = distribution
-                except ValueError:
-                    substate = str(node.getAttribute('label'))
-                    distributions[substate] = distribution
-            node = node.nextSibling
-        if distributions:
-            # For backward compatibility with non-integer substates
-            if self.distributions:
-                substate = max(self.distributions.keys())+1
-            else:
-                substate = 0
-            for distribution in distributions.values():
-                self.distributions[substate] = distribution
-                for key in distribution.keys():
-                    self.keyMap[key] = substate
-                substate += 1
-        
+    def delete_value(self, key, value):
+        """Removes the given value for the given key from the state and then renormalizes
+        """
+        distribution = self.distributions[self.keyMap[key]]
+        for vector in distribution.domain():
+            if vector[key] == value:
+                del distribution[vector]
+        distribution.normalize()
+
     def __deepcopy__(self,memo):
         result = self.__class__()
         for substate,distribution in self.distributions.items():
@@ -806,7 +779,7 @@ class VectorDistributionSet:
         else:
             raise RuntimeError('Use either ignore or include sets, but not both')
         for key in keySubset:
-            if not key in result:
+            if key not in result and key in self:
                 distribution = self.distributions[self.keyMap[key]]
                 substate = len(result.distributions)
                 result.distributions[substate] = distribution.__class__()
