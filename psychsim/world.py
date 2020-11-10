@@ -970,7 +970,7 @@ class World(object):
             except AttributeError:
                 self.extras[key] = '%s:%d' % (mod,frame[2])
 
-    def setFeature(self,key,value,state=None,noclobber=False):
+    def setFeature(self, key, value, state=None, noclobber=False, recurse=False):
         """
         Set the value of an individual element of the state vector
         :param key: the label of the element to set
@@ -978,6 +978,7 @@ class World(object):
         :type value: float or L{psychsim.probability.Distribution}
         :param state: the state distribution to modify (default is the current world state)
         :type state: L{VectorDistribution}
+        :param recurse: if True, set this feature to the given value for all agents' beliefs (and beliefs of beliefs, etc.)
         """
         assert key in self.variables,'Unknown element "%s"' % (key)
 #        if state is None or state is self.state:
@@ -1011,6 +1012,12 @@ class World(object):
         else:
             assert not isinstance(value,Distribution)
             state[key] = self.value2float(key,value)
+        if recurse:
+            for name, models in self.get_current_models(state).items():
+                for model in models:
+                    beliefs = self.agents[name].models[model]['beliefs']
+                    if beliefs is not True and key in beliefs:
+                        self.setFeature(key, value, beliefs, noclobber)
 
     def setJoint(self,distribution,state=None):
         """
@@ -1233,6 +1240,35 @@ class World(object):
         if state is None:
             state = self.state
         return self.getFeature(modelKey(modelee),state,unique)
+
+    def get_current_models(self, state=None, cycle_check=False, all_models=None):
+        if state is None:
+            state = self.state
+        if all_models is None:
+            all_models = set()
+        result = {}
+        for key in state.keys():
+            if isModelKey(key):
+                name = state2agent(key)
+                models = set(self.getFeature(key, state).domain())
+                cycles = models & all_models
+                if cycle_check and cycles:
+                    raise ValueError('Cycle in beliefs for models: {}'.format(', '.join(sorted(cycles))))
+                all_models |= models
+                result[name] = result.get(name, set()) | models
+                for model in models - cycles:
+                    if self.agents[name].models[model]['beliefs'] is not True:
+                        beliefs = self.agents[name].getBelief(model=model)
+                        new_models = self.get_current_models(beliefs, cycle_check, all_models)
+                        for sub_name, sub_models in new_models.items():
+                            if cycle_check:
+                                cycles = sub_models & all_models
+                                if cycles:
+                                    raise ValueError('Cycle in beliefs for models: {}'.format(', '.join(sorted(cycles))))
+                            all_models |= sub_models
+                            result[sub_name] = result.get(sub_name, set()) | sub_models
+        return result
+
 
     def getMentalModel(self,modelee,vector):
         raise DeprecationWarning('Substitute getModel instead (sorry for pedanticism, but a "model" may be real, not "mental")')
