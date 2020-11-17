@@ -164,13 +164,16 @@ class World(object):
         if updateBeliefs:
             # Update agent models included in the original world
             # (after finding out possible new worlds)
-            agentsModeled = [name for name in self.agents if modelKey(name) in state and self.agents[name].omega is not True]
+            agentsModeled = [name for name in self.agents if modelKey(name) in state]
             for name in agentsModeled:
                 key = modelKey(name)
                 agent = self.agents[name]
-                substate = state.collapse(agent.omega+[key],False)
+                if isinstance(agent.omega, list):
+                    substate = state.collapse(agent.omega+[key],False)
+                else:
+                    substate = None
                 agent.updateBeliefs(state,policies,horizon=horizon)
-                if select:
+                if select and substate is not None:
                     state.distributions[substate].select(select == 'max')
             # The future becomes the present
             state.rollback()
