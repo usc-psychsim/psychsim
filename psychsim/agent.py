@@ -668,6 +668,7 @@ class Agent(object):
         else:
             self.world.defineVariable(key,ActionSet,description='Action performed by %s' % (self.name))
             self.world.setFeature(key,new)
+        self.world.dynamics[new] = {}
         return new
 
     def getActions(self,vector=None,actions=None):
@@ -1148,7 +1149,7 @@ class Agent(object):
             if beliefs is True:
                 world = copy.deepcopy(vector)
             else:
-                world = copy.deepcopy(beliefs)
+                world = beliefs # copy.deepcopy(beliefs)
             return world
 
     def updateBeliefs(self,state=None,actions=set(),horizon=None):
@@ -1185,7 +1186,6 @@ class Agent(object):
                     newModel = self.models[newModel]['index']
             except KeyError:
                 pass
-            oldBelief = self.getBelief(model=oldModel)
             if myAction in self.models[oldModel]['SE'] and label in self.models[oldModel]['SE'][myAction]:
                 newModel = self.models[oldModel]['SE'][myAction][label]
                 if newModel is None:
@@ -1268,11 +1268,24 @@ class Agent(object):
         trueState.distributions[substate] = newDist
         for vector,prob in [(vector,oldDist[vector]) for vector in oldDist.domain()]:
             oldModel = self.world.float2value(oldModelKey,vector[oldModelKey])
+            logging.debug('{} updating beliefs {} under model {} (horizon={})'.format(self.name, str(vector), oldModel, horizon))
             if self.getAttribute('static',oldModel) is True:
                 # My beliefs (and my current mental model) never change
                 newModel = oldModel
+            elif self.omega is True:
+                # My beliefs change, but they are accurate
+                old_beliefs = self.models[oldModel]['beliefs']
+                new_beliefs = trueState.copySubset(include=old_beliefs.keys()-vector.keys())
+                for key in vector.keys():
+                    if key == oldModelKey:
+                        newModel = self.belief2model(oldModel, new_beliefs)['name']
+                        self.world.setFeature(oldModelKey, newModel, new_beliefs)
+                    elif key != CONSTANT:
+                        self.world.setFeature(key, vector[key], new_beliefs)
             else:
                 SE = self.models[oldModel]['SE']
+                logging.debug('SE({}): {}'.format(oldModel, SE))
+                P = {} # self.models[oldModel]['transition']
                 # Identify label for overall observation
                 omega = tuple([vector[o] for o in self.omega])
                 if omega not in SE:
