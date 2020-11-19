@@ -190,31 +190,61 @@ class Agent(object):
                 # Use real model as fallback?
                 model = self.world.getModel(self.name)
         assert not model is True
+#        print(self.name, model)
         if isinstance(model,Distribution):
             result = {}
             tree = None
             myAction = keys.stateKey(self.name,keys.ACTION)
             myModel = keys.modelKey(self.name)
+            action_leaves = {}
+            deterministic = True
             for submodel in model.domain():
                 result[submodel] = self.decide(state,horizon,others,submodel,
                                                selection,actions,keySet)
                 if isinstance(result[submodel]['action'],Distribution):
-                    if len(result[submodel]['action']) > 1:
-                        matrix = {'distribution': [(setToConstantMatrix(myAction,el),
-                                                    result[submodel]['action'][el]) \
-                                                   for el in result[submodel]['action'].domain()]}
+                    deterministic = False
+                elif deterministic:
+                    try:
+                        action_leaves[result[submodel]['action']].add(submodel)
+                    except KeyError:
+                        action_leaves[result[submodel]['action']] = {submodel}
+            if deterministic:
+                if len(action_leaves) == 1:
+                    # Only one possible action, no matter what model holds
+                    tree = setToConstantMatrix(myAction, next(iter(action_leaves.keys())))
+                else:
+                    # Multiple branches necessary
+                    tree = None
+                    for action, submodels in action_leaves.items():
+                        if tree is None:
+                            tree = setToConstantMatrix(myAction, action)
+                        else:
+                            tree = {'if': equalRow(myModel, submodels),
+                                True: setToConstantMatrix(myAction, action),
+                                False: tree}
+            else:
+                for submodel in model.domain():
+                    if isinstance(result[submodel]['action'],Distribution):
+                        if len(result[submodel]['action']) > 1:
+                            matrix = {'distribution': [(setToConstantMatrix(myAction,el),
+                                                        result[submodel]['action'][el]) \
+                                                       for el in result[submodel]['action'].domain()]}
+                        else:
+                            # Distribution with 100% certainty
+                            matrix = setToConstantMatrix(myAction,result[submodel]['action'].first())
                     else:
-                        # Distribution with 100% certainty
-                        matrix = setToConstantMatrix(myAction,result[submodel]['action'].first())
-                else:
-                    matrix = setToConstantMatrix(myAction,result[submodel]['action'])
-                if tree is None:
-                    # Assume it's this model (?)
-                    tree = matrix
-                else:
-                    plane = equalRow(myModel,submodel)
-                    tree = {'if': plane, True: matrix,False: tree}
+                        matrix = setToConstantMatrix(myAction,result[submodel]['action'])
+                    if tree is None:
+                        # Assume it's this model (?)
+                        tree = matrix
+                    else:
+                        plane = equalRow(myModel,submodel)
+                        tree = {'if': plane, True: matrix,False: tree}
+#            print(model)
+#            print(tree)
             result['policy'] = makeTree(tree)
+#            if len(model) == 1:
+#                assert result['policy'].isLeaf()
             return result
         if selection is None:
             selection = self.getAttribute('selection',model)
@@ -327,6 +357,8 @@ class Agent(object):
             keySet = belief.keys()
         # Compute value across possible worlds
         logging.debug('Considering %s as %s' % (action,model))
+        assert model in self.world.getFeature(modelKey(self.name), belief).domain(), '{}  not in {}'.format(model, str(self.world.getFeature(modelKey(self.name), belief).domain()))
+        assert len(self.world.getFeature(modelKey(self.name), belief)) == 1
         current = copy.deepcopy(belief)
 #        if model:
 #            self.world.setFeature(modelKey(self.name),model,current)
@@ -1294,22 +1326,36 @@ class Agent(object):
                     myAction = self.world.float2value(actionKey(self.name),vector[actionKey(self.name)])
                 else:
                     myAction = None
+                if myAction not in P:
+                    P[myAction] = {}
                 if myAction not in SE[omega]:
                     SE[omega][myAction] = {}
+                logging.debug('{} {} {} {} {}'.format(self.name, oldModel, omega, myAction, horizon))
+                for temp_action, table in P.items():
+                    logging.debug('{}: {}'.format(temp_action, str(table)))
                 if horizon in SE[omega][myAction]:
                     newModel = SE[omega][myAction][horizon]
                     if newModel is None:
                         # Processing this somewhere above me in the recursion
+                        logging.debug('Avoid redundancy...')
                         newModel = oldModel
                 else:
                     # Work to be done. First, mark that we've started processing this transition
                     SE[omega][myAction][horizon] = None
-                    original = self.getBelief(model=oldModel)
-                    # Get old belief state.
-                    beliefs = copy.deepcopy(original)
-                    # Project direct effect of the actions, including possible observations
-                    outcome = self.world.step({self.name: myAction} if myAction else None,beliefs,
-                        keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=True)
+                    try:
+                        original = None
+                        beliefs = copy.deepcopy(P[myAction][horizon])
+                        logging.debug('Retrieved step result')
+                    except KeyError:
+                        original = self.getBelief(model=oldModel)
+                        # Get old belief state.
+                        beliefs = copy.deepcopy(original)
+                        # Project direct effect of the actions, including possible observations
+                        logging.debug('Stepping ')
+                        self.world.step({self.name: myAction} if myAction else None,beliefs,
+                            keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=True)
+                        logging.debug('Step complete')
+                        P[myAction][horizon] = copy.deepcopy(beliefs)
                     # Condition on actual observations
                     for o in self.omega:
                         if o not in beliefs:
@@ -1325,10 +1371,12 @@ class Agent(object):
                                 newModel = None
                                 logging.warning('%s (model %s) has impossible observation %s=%s when doing %s' % \
                                               (self.name,oldModel,o,self.world.float2value(o,vector[o]),myAction))
+                                logging.warning('Allowable values are: {}'.format(', '.join([str(t) for t in beliefs.marginal(o).domain()])))
                                 if o in self.world.dynamics and myAction in self.world.dynamics[o]:
                                     logging.warning('Action effect is:\n%s' % (self.world.dynamics[o][myAction]))
-                                    logging.warning('Believed values are:\n%s' % ('\n'.join(['\t%s: %s' % (k,self.world.getFeature(k,original))
-                                        for k in self.world.dynamics[o][myAction].getKeysIn() if k !=CONSTANT])))
+                                    if original is not None:
+                                        logging.warning('Believed values are:\n%s' % ('\n'.join(['\t%s: %s' % (k,self.world.getFeature(k,original))
+                                            for k in self.world.dynamics[o][myAction].getKeysIn() if k !=CONSTANT])))
                                     logging.warning('Original values are:\n%s' % ('\n'.join(['\t%s: %s (%d)' % (k,self.world.getFeature(k,vector),vector[k])
                                         for k in self.world.dynamics[o][myAction].getKeysIn() if k !=CONSTANT and k in vector])))
                                 break
