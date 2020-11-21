@@ -357,6 +357,7 @@ class Agent(object):
             keySet = belief.keys()
         # Compute value across possible worlds
         logging.debug('Considering %s as %s' % (action,model))
+        assert modelKey(self.name) in belief, '{} ({}) has no model of self when computing value of {}'.format(self.name, model, action)
         assert model in self.world.getFeature(modelKey(self.name), belief).domain(), '{}  not in {}'.format(model, str(self.world.getFeature(modelKey(self.name), belief).domain()))
         assert len(self.world.getFeature(modelKey(self.name), belief)) == 1
         current = copy.deepcopy(belief)
@@ -1044,16 +1045,20 @@ class Agent(object):
         if 'beliefs' in parent and parent['beliefs'] == belief:
             return parent
         # Find model sharing same parent that has same beliefs
-        for model in filter(lambda m: m['parent'] == parent['name'],self.models.values()):
-            if 'beliefs' in model and not model['beliefs'] is True:
-                if model['beliefs'] == belief:
-                    return model
-        else:
-            # Create a new model
-            index = 1
-            while '%s%d' % (parent['name'],index) in self.models:
-                index += 1
-            return self.addModel('%s%d' % (parent['name'],index),beliefs=belief,parent=parent['name'])
+#        for model in filter(lambda m: m['parent'] == parent['name'],self.models.values()):
+#            if 'beliefs' in model and not model['beliefs'] is True:
+#                if model['beliefs'] == belief:
+#                    return model
+#        else:
+        # Create a new model
+        name = '%s%d' % (parent['name'], hash(str(belief)))
+        if name in self.models:
+            for key in belief.keys():
+                if belief[key] != self.models[name]['beliefs'][key]:
+                    assert key == modelKey(self.name), 'Hash collision for {}!'.format(self.name)
+            else:
+                return self.models[name]
+        return self.addModel(name, beliefs=belief, parent=parent['name'])
 
     def printModel(self,model=None,buf=None,index=None,prefix='',reward=False,previous=None):
         if isinstance(index,int) or isinstance(index,float):
@@ -1138,8 +1143,8 @@ class Agent(object):
                 beliefs = stateType()
                 for vector in state.domain():
                     beliefs.addProb(vector.__class__({key: vector[key] for key in include if key not in ignore}),state[vector])
-        if modelKey(self.name) in beliefs:
-            self.world.setFeature(modelKey(self.name),model,beliefs)
+        if (include is None or modelKey(self.name) in include) and (ignore is None or modelKey(self.name) not in ignore):
+            self.world.setFeature(modelKey(self.name), model, beliefs)
         self.models[model]['beliefs'] = beliefs
         return beliefs
         
