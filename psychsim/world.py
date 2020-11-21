@@ -1312,70 +1312,15 @@ class World(object):
         """
         Garbage collect orphaned models.
         """
-        if check:
-            # Record initial indices for verification purposes
-            indices = {}
-            for name,agent in self.agents.items():
-                indices[name] = {}
-                for label,model in agent.models.items():
-                    indices[name][label] = agent.model2index(label)
-                    assert agent.index2model(indices[name][label]) == label
-        # Keep track of which models are active for each agent and who their parent models are
-        parents = {}
-        children = {}
-        for name in self.agents.keys():
-            parents[name] = {}
-            children[name] = set()
-        # Start with the worlds in the current state
-        remaining = self.state[None].domain()
-        realWorld = True
-        while len(remaining) > 0:
-            newRemaining = []
-            for vector in remaining:
-                # Look for models of each agent
-                for name,agent in self.agents.items():
-                    key = modelKey(name)
-                    if key in vector:
-                        # This world specifies an active model
-                        model = agent.index2model(vector[key])
-                    elif realWorld:
-                        # No explicit specification, so assume True
-                        model = True
-                    else:
-                        model = None
-                    if model:
-                        children[name].add(model)
-                        try:
-                            parents[name][agent.models[model]['parent']].append(model)
-                        except KeyError:
-                            parents[name][agent.models[model]['parent']] = [model]
-                        if 'beliefs' in agent.models[model]:
-                            while not isinstance(agent.models[model]['beliefs'],psychsim.pwl.VectorDistribution):
-                                # Beliefs are symbolic link to another model
-                                model = agent.models[model]['beliefs']
-                                if model in children[name]:
-                                    # Already processed this model
-                                    break
-                                else:
-                                    children[name].add(model)
-                            else:
-                                # Recurse into the worlds within this agent's subjective view
-                                newRemaining += agent.models[model]['beliefs'].domain()
-            realWorld = False
-            remaining = newRemaining
-        # Remove inactive models
-#        for name,active in children.items():
-#            agent = self.agents[name]
-#            for model in agent.models.keys():
-#                if not model in active and not model in parents[name]:
-#                    # Inactive model with no dependencies
-#                    agent.deleteModel(model)
-        if check:
-            # Verify final indices
-            for name,agent in self.agents.items():
-                for label,model in agent.models.items():
-                    assert indices[name][label] == agent.model2index(label)
-                    assert agent.index2model(indices[name][label]) == label
+        for name, active_models in self.get_current_models().items():
+            agent = self.agents[name]
+            parents = set(active_models)
+            while parents:
+                parents = {agent.models[model]['parent'] for model in parents} - {None}
+                active_models |= parents
+            for model in list(agent.models.keys()):
+                if model not in active_models:
+                    del agent.models[model]
 
     def updateModels(self,outcome,vector):
         for agent in self.agents.values():
