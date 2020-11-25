@@ -237,6 +237,12 @@ class Distribution(dict):
                 result.addProb(element*other,self[element])
             return result
 
+    def scale_prob(self, factor):
+        """
+        :return: a new Distribution whose probability values have all been multiplied by the given factor
+        """
+        return self.__class__({element: prob*factor for element, prob in self.items()})
+        
     def prune(self,epsilon=1e-8):
         elements = self.domain()
         i = 0
