@@ -1269,7 +1269,7 @@ class Agent(object):
         for vector,prob in [(vector,oldDist[vector]) for vector in oldDist.domain()]:
             oldModel = self.world.float2value(oldModelKey,vector[oldModelKey])
             logging.debug('{} updating beliefs {} under model {} (horizon={})'.format(self.name, str(vector), oldModel, horizon))
-            if self.getAttribute('static',oldModel) is True:
+            if self.getAttribute('static',oldModel) is True or self.models[oldModel]['beliefs'] is True:
                 # My beliefs (and my current mental model) never change
                 newModel = oldModel
             elif self.omega is True:
