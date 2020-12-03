@@ -497,6 +497,18 @@ class VectorDistribution(Distribution):
         else:
             raise NotImplementedError('Domain available for only a single variable')
 
+    def group_by_certainty(self, suppress_certain=False):
+        vectors = list(self.domain())
+        certain = {key: vectors[0][key] for key in self.keys()}
+        for vector in vectors[1:]:
+            for key, value in list(certain.items()):
+                if vector[key] != value:
+                    del certain[key]
+        certain_str = str(self.__class__({vectors[0].__class__(certain): 1}))
+        uncertain_str = str(self.__class__({vectors[0].__class__({key: vector[key] for key in self.keys()-certain.keys()}): self[vector]
+            for vector in vectors}))
+        return uncertain_str if suppress_certain else '{}\n{}'.format(certain_str, uncertain_str)
+        
     def __str__(self):
         return '\n'.join(['%d%%\n%s' % (prob*100,vector.sortedString()) 
             for vector,prob in sorted(self.items(),key=lambda i: i[1],reverse=True)])
