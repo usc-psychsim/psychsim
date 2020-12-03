@@ -812,3 +812,16 @@ class VectorDistributionSet:
             else:
                 assert sum(distribution.values())<1.000001,'Distribution sums to %4.2f' % \
                     (sum(distribution.values()))
+
+    def copy_value(self, old_key, new_key):
+        """
+        Modifies the state so that the distribution over the new key's values is identical to that of the old key
+        """
+        substate = self.keyMap[old_key]
+        self.keyMap[new_key] = substate
+        dist = self.distributions[substate]
+        for vector in dist.domain():
+            prob = dist[vector]
+            del dist[vector]
+            vector[new_key] = vector[old_key]
+            dist[vector] = prob

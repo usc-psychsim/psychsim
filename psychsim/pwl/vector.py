@@ -113,6 +113,12 @@ class KeyedVector(collections.abc.MutableMapping):
                     self[row] = self*vector
         return self
 
+    def copy_value(self, old_key, new_key):
+        """
+        Modifies the state so that the distribution over the new key's values is identical to that of the old key
+        """
+        self[new_key] = self[old_key]
+        
     def rollback(self,future=None):
         if future is None:
             future = [key for key in self if keys.isFuture(key)]
@@ -276,31 +282,6 @@ class KeyedVector(collections.abc.MutableMapping):
     def __hash__(self):
         return hash(tuple(self._data.items()))
 #        return hash(frozenset(self._data.items()))
-
-    def __xml__(self):
-        doc = Document()
-        root = doc.createElement('vector')
-        for key,value in self.items():
-            node = doc.createElement('entry')
-            node.setAttribute('key',key)
-            node.setAttribute('value',str(value))
-            root.appendChild(node)
-        doc.appendChild(root)
-        return doc
-
-    def parse(self,element):
-        self._string = None
-        node = element.firstChild
-        while node:
-            if node.nodeType == node.ELEMENT_NODE:
-                assert node.tagName == 'entry'
-                key = str(node.getAttribute('key'))
-                try:
-                    value = float(node.getAttribute('value'))
-                except ValueError:
-                    value = str(node.getAttribute('value'))
-                self._data.__setitem__(key,value)
-            node = node.nextSibling
 
 class VectorDistribution(Distribution):
     """
@@ -486,6 +467,19 @@ class VectorDistribution(Distribution):
             new = KeyedVector(vector)
             result[new] = self[vector]
         return result
+
+    def copy_value(self, old_key, new_key):
+        """
+        Modifies the state so that the distribution over the new key's values is identical to that of the old key
+        """
+        original = dict(self)
+        domain = self.domain()
+        self.clear()
+        for row in domain:
+            assert isinstance(row, KeyedVector)
+            prob = original[hash(row)]
+            row[new_key] = row[old_key]
+            self[row] = prob
 
     def rollback(self,future=None):
         original = [(vector, self[vector]) for vector in self.domain()]
