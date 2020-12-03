@@ -171,15 +171,15 @@ class VectorDistributionSet:
             result[value].distributions[destination][vector] = original[vector]
         return result
         
-    def collapse(self,substates,preserveCertainty=True):
+    def collapse(self, substates, preserve_certainty=True):
         """
         Collapses (in place) the given substates into a single joint L{VectorDistribution}
         """
         if len(substates) > 0:
-            if isinstance(next(iter(substates)),str):
+            if isinstance(next(iter(substates)), str):
                 # Why not handle keys, too?
                 substates = self.substate(substates)
-            if preserveCertainty:
+            if preserve_ertainty:
                 substates = {s for s in substates
                              if len(self.distributions[s]) > 1}
             result = self.merge(substates)
