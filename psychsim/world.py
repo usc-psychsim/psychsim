@@ -2,7 +2,6 @@ from __future__ import print_function
 import bz2
 import copy
 import logging
-import inspect
 import multiprocessing
 import os
 import pickle
@@ -488,7 +487,7 @@ class World(object):
         keysIn = tree.getKeysIn()
         keysOut = tree.getKeysOut()
     
-    def setDynamics(self,key,action,tree,enforceMin=False,enforceMax=False,codePtr=True):
+    def setDynamics(self,key,action,tree,enforceMin=False,enforceMax=False,codePtr=False):
         """
         Defines the effect of an action on a given state feature
         :param key: the key of the affected state feature
@@ -537,6 +536,8 @@ class World(object):
 #        if action is not True and len(action) == 1:
 #            self.dynamics[next(iter(action))][key] = tree
         if codePtr:
+            import inspect
+
             frame = inspect.getouterframes(inspect.currentframe())[1]
             try:
                 fname = frame.filename
@@ -884,7 +885,7 @@ class World(object):
     """-------------"""
 
     def defineVariable(self,key,domain=float,lo=0.,hi=1.,description=None,
-                       combinator=None,substate=None,codePtr=True):
+                       combinator=None,substate=None,codePtr=False):
         """
         Define the type and domain of a given element of the state vector
 
@@ -957,6 +958,8 @@ class World(object):
         self.dependency.clear()
         if codePtr:
             if codePtr is True:
+                import inspect
+
                 for frame in inspect.getouterframes(inspect.currentframe()):
                     try:
                         fname = frame.filename
@@ -1165,7 +1168,7 @@ class World(object):
         raise DeprecationWarning('Use float2value method instead')
 
     def defineState(self,entity,feature,domain=float,lo=0.,hi=1.,description=None,combinator=None,
-                    substate=None,codePtr=True):
+                    substate=None,codePtr=False):
         """
         Defines a state feature associated with a single agent, or with the global world state.
         :param entity: if C{None}, the given feature is on the global world state; otherwise, it is local to the named agent
@@ -1183,14 +1186,15 @@ class World(object):
             self.defineVariable(key,domain,lo,hi,description,combinator,substate,codePtr)
         return key
 
-    def setState(self,entity,feature,value,state=None):
+    def setState(self, entity, feature, value, state=None, recurse=False):
         """
         For backward compatibility
         :param entity: the name of the entity whose state feature we're setting (does not have to be an agent)
         :type entity: str
         :type feature: str
+        :param recurse: if True, set this feature to the given value for all agents' beliefs (and beliefs of beliefs, etc.)
         """
-        self.setFeature(stateKey(entity,feature),value,state)
+        self.setFeature(stateKey(entity, feature), value, state, recurse)
 
     def getState(self,entity,feature,state=None,unique=False):
         """
