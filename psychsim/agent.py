@@ -1,6 +1,5 @@
 from __future__ import print_function
 import copy
-import inspect
 import logging
 import math
 import multiprocessing
@@ -614,7 +613,7 @@ class Agent(object):
     """Action methods"""
     """------------------"""
 
-    def addAction(self,action,condition=None,description=None,codePtr=True):
+    def addAction(self,action,condition=None,description=None,codePtr=False):
         """
         :param condition: optional legality condition
         :type condition: L{KeyedPlane}
@@ -644,6 +643,8 @@ class Agent(object):
             self.legal[new] = condition.desymbolize(self.world.symbols)
         if codePtr:
             if codePtr is True:
+                import inspect
+
                 for frame in inspect.getouterframes(inspect.currentframe()):
                     try:
                         fname = frame.filename
@@ -730,8 +731,11 @@ class Agent(object):
     """State methods"""
     """------------------"""
 
-    def setState(self,feature,value,state=None):
-        return self.world.setState(self.name,feature,value,state)
+    def setState(self, feature, value, state=None, recurse=False):
+        """
+        :param recurse: if True, set this feature to the given value for all agents' beliefs (and beliefs of beliefs, etc.)
+        """        
+        return self.world.setState(self.name, feature, value, state, recurse)
 
     def getState(self,feature,state=None,unique=False):
         return self.world.getState(self.name,feature,state,unique)
@@ -1251,7 +1255,7 @@ class Agent(object):
 #            newBelief = self.getBelief(model=newModel)
         return model
 
-    def updateBeliefsOLD(self,trueState=None,actions={},horizon=None):
+    def updateBeliefsOLD(self, trueState=None, actions={}, horizon=None):
         """
         .. warning:: Even if this agent starts with ``True`` beliefs, its beliefs can deviate after actions with stochastic effects (i.e., the world transitions to a specific state with some probability, but the agent only knows a posterior distribution over that resulting state). If you want the agent's beliefs to stay correct, then set the ``static`` attribute on the model to ``True``.
 
