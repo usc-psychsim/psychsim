@@ -158,8 +158,10 @@ class World(object):
         effect.append(self.deltaTurn(state,policies))
         for stage in effect:
             state = self.applyEffect(state,stage,select)
+        assert state.is_minimal() 
         # The future becomes the present
         state.rollback()
+        assert state.is_minimal() 
         if updateBeliefs:
             # Update agent models included in the original world
             # (after finding out possible new worlds)
@@ -168,19 +170,26 @@ class World(object):
                 key = modelKey(name)
                 agent = self.agents[name]
                 if isinstance(agent.omega, list):
-                    substate = state.collapse(agent.omega+[key],False)
+                    substate = state.collapse(agent.omega+[key])
                 else:
                     substate = None
-                agent.updateBeliefs(state,policies,horizon=horizon)
+                logging.info('{} observing {} worlds'.format(name, len(state.distributions[substate]) if substate is not None else 1))
+#                if substate is not None and len(state.distributions[substate]) > 8:
+#                    logging.info(state.distributions[substate].group_by_certainty(True))
+                agent.updateBeliefs(state, policies, horizon=horizon)
+                logging.info('{} updated   {} worlds'.format(name, len(state.distributions[substate]) if substate is not None else 1))
                 if select and substate is not None:
                     state.distributions[substate].select(select == 'max')
             # The future becomes the present
             state.rollback()
+        assert state.is_minimal() 
 
         if select:
             state.select(select=='max')
+        assert state.is_minimal() 
         if threshold is not None:
             state.prune(threshold)
+        assert state.is_minimal() 
         if self.memory:
             self.history.append(copy.deepcopy(state))
            # self.modelGC(False)
@@ -281,28 +290,7 @@ class World(object):
         else:
             for key,dynamics in effect.items():
                 if dynamics is None:
-                    # No dynamics, so status quo
-                    newKey = makeFuture(key)
-                    if isinstance(state,VectorDistributionSet):
-                        substate = state.keyMap[key]
-                        state.keyMap[newKey] = substate
-                        dist = state.distributions[substate]
-                        for vector in dist.domain():
-                            prob = dist[vector]
-                            del dist[vector]
-                            vector[newKey] = vector[key]
-                            dist[vector] = prob
-                    elif isinstance(state,VectorDistribution):
-                        original = dict(state)
-                        domain = state.domain()
-                        state.clear()
-                        for row in domain:
-                            assert isinstance(row,KeyedVector)
-                            prob = original[hash(row)]
-                            row[newKey] = row[key]
-                            state[row] = prob
-                    else:
-                        state[newKey] = state[key]
+                    pass
                 elif len(dynamics) == 1:
                     tree = dynamics[0]
                     if select:
@@ -313,34 +301,19 @@ class World(object):
                         elif default_select and key not in select:
                             # We are selecting a specific value, just not for this particular state feature
                             tree = tree.sample(False,None if isinstance(state,VectorDistributionSet) else state)
+                    for in_key in tree.getKeysIn():
+                        if isFuture(in_key) and in_key not in state:
+                            state.copy_value(makePresent(in_key), in_key)
+                    try:
                         state *= tree
-                        if isinstance(select,dict) and key in select:
-                            if select[key] not in state.marginal(makeFuture(key)):
-                                raise ValueError('Selecting impossible value "%s" for %s (nonzero probability for %s)' % \
-                                    (self.float2value(key,select[key]),key,
-                                        ', '.join(['"%s"' % (self.float2value(key,el)) 
-                                            for el in state.marginal(makeFuture(key)).domain()])))
-                            state[makeFuture(key)] = select[key]
-                    else:
-                        try:
-                            state *= tree
-                        except StopIteration:
-                            self.printState(state)
-                            print(tree)
-                            raise RuntimeError
-                        except KeyError:
-                            print('Applying effect on %s' % (key))
-                            print('Effect tree is\n%s' % (tree))
-#                            print('State contains only: %s' % (sorted(state.keys())))
-#                            if isinstance(state,KeyedVector):
-#                                self.printVector(state)
-#                            elif isinstance(state,VectorDistributionSet):
-#                                self.printState(state)
-#                            else:
-#                                for vec in state.domain():
-#                                    print(state[vec])
-#                                    self.printVector(vec)
-                            raise
+                    except StopIteration:
+                        self.printState(state)
+                        print(tree)
+                        raise RuntimeError
+                    except KeyError:
+                        print('Applying effect on %s' % (key))
+                        print('Effect tree is\n%s' % (tree))
+                        raise
                 else:
                     cumulative = None
                     for tree in dynamics:
@@ -360,11 +333,13 @@ class World(object):
                                 raise TypeError('Unable to generate selective effect from:\n%s' % (tree))
                     else:
                         state *= tree
-                if select and isinstance(state,VectorDistributionSet):
-                    substate = state.keyMap[makeFuture(key)]
-                    if len(state.distributions[substate]) > 1:
-                        if isinstance(select,dict) and key in select:
-                            state[makeFuture(key)] = select[key]
+                if isinstance(select,dict) and key in select:
+                    if select[key] not in state.marginal(makeFuture(key)):
+                        raise ValueError('Selecting impossible value "%s" for %s (nonzero probability for %s)' % \
+                            (self.float2value(key,select[key]),key,
+                                ', '.join(['"%s"' % (self.float2value(key,el)) 
+                                    for el in state.marginal(makeFuture(key)).domain()])))
+                    state[makeFuture(key)] = select[key]
         return state
 
     def addTermination(self,tree,action=True):
