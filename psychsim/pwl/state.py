@@ -18,6 +18,7 @@ class VectorDistributionSet:
     """
     def __init__(self,node=None):
         self.distributions = {}
+        self.certain = {}
         self.keyMap = {}
         if isinstance(node,dict):
             substate = 0
@@ -27,10 +28,8 @@ class VectorDistributionSet:
         elif isinstance(node,VectorDistribution):
             self.distributions[0] = node
             self.keyMap = {k: 0 for k in node.keys()}
-        elif node:
-            self.parse(node)
-#        elif not empty:
-#            self.distributions[0] = VectorDistribution()
+        elif node is not None:
+            raise TypeError('Unknown argument type for constructor: {}'.format(type(node).__name__))
 
     def keys(self):
         return self.keyMap.keys()
@@ -51,6 +50,7 @@ class VectorDistributionSet:
             size *= len(dist.domain())
         for i in range(size):
             value = self.__class__()
+            value.certain.update(self.certain)
             value.keyMap.update(self.keyMap)
             for substate in substates:
                 element = domains[substate][i % len(domains[substate])]
@@ -70,7 +70,8 @@ class VectorDistributionSet:
                 prob *= sum(distribution.values())
         else:
             for key,value in vector.items():
-                prob *= self.marginal(key)[value]
+                if self.keyMap[key] is not None:
+                    prob *= self.marginal(key)[value]
         return prob
 
     def __len__(self):
@@ -91,17 +92,26 @@ class VectorDistributionSet:
         Computes a conditional probability of this distribution given the value for this key. To do so, it removes any elements from the distribution that are inconsistent with the given value and then normalizes.
         .. warning:: If you want to overwrite any existing values for this key use L{join} (which computes a new joint probability)
         """
-        dist = self.distributions[self.keyMap[key]]
-        for vector in dist.domain():
-            if abs(vector[key]-value) > 1e-8:
-                del dist[vector]
-        dist.normalize()
+        substate = self.keyMap[key]
+        if substate is None:
+            if self.certain[key] != value:
+                raise ValueError('P({}={}) = 0 because {}={}'.format(key, value, key, self.certain[key]))
+        else:
+            dist = self.distributions[substate]
+            for vector in dist.domain():
+                if abs(vector[key]-value) > 1e-8:
+                    del dist[vector]
+            dist.normalize()
         
     def subDistribution(self,key):
         """
         :return: the minimal joint distribution containing this key
         """
-        return self.distributions[self.keyMap[key]]
+        substate = self.keyMap[key]
+        if substate is None:
+            return VectorDistribution({KeyedVector({key: self.certain[key]}): 1})
+        else:
+            return self.distributions[substate]
 
     def __delitem__(self,key):
         """"
@@ -109,17 +119,20 @@ class VectorDistributionSet:
         """
         substate = self.keyMap[key]
         del self.keyMap[key]
-        dist = self.distributions[substate]
-        if len(dist.first()) == 2:
-            # Assume CONSTANT is the other key, so this whole distribution goes
-            del self.distributions[substate]
+        if substate is None:
+            del self.certain[key]
         else:
-            # Go through each vector and remove the key
-            for vector in dist.domain():
-                prob = dist[vector]
-                del dist[vector]
-                del vector[key]
-                dist.addProb(vector,prob)
+            dist = self.distributions[substate]
+            if len(dist.first()) <= 2:
+                # Assume CONSTANT is the other key, so this whole distribution goes
+                del self.distributions[substate]
+            else:
+                # Go through each vector and remove the key
+                for vector in dist.domain():
+                    prob = dist[vector]
+                    del dist[vector]
+                    del vector[key]
+                    dist.addProb(vector,prob)
 
     def deleteKeys(self,toDelete):
         """
@@ -129,7 +142,9 @@ class VectorDistributionSet:
         for key in toDelete:
             substate = self.keyMap[key]
             del self.keyMap[key]
-            if substate in distributions:
+            if substate is None:
+                del self.certain[key]
+            elif substate in distributions:
                 old = distributions[substate]
                 distributions[substate] = []
                 for vector,prob in old:
@@ -179,7 +194,7 @@ class VectorDistributionSet:
             if isinstance(next(iter(substates)), str):
                 # Why not handle keys, too?
                 substates = self.substate(substates)
-            if preserve_ertainty:
+            if preserve_certainty:
                 substates = {s for s in substates
                              if len(self.distributions[s]) > 1}
             result = self.merge(substates)
@@ -825,3 +840,17 @@ class VectorDistributionSet:
             del dist[vector]
             vector[new_key] = vector[old_key]
             dist[vector] = prob
+
+    def is_minimal(self):
+        """
+        :return: False iff any non-singleton distributions are non-singleton for all variables in that distribution"
+        """
+        for dist in self.distributions.values():
+            if len(dist) > 1:
+                for vector in dist.domain():
+                    for key in vector.keys():
+                        if key != keys.CONSTANT and len(self.marginal(key)) == 1:
+                            # This feature is 100% certain, yet exists in a distribution that is uncertain
+                            return False
+        else:
+            return True                            
