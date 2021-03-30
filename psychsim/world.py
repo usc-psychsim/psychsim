@@ -128,7 +128,7 @@ class World(object):
     """------------------"""
                 
     def step(self,actions=None,state=None,real=True,select=False,keySubset=None,
-             horizon=None,tiebreak=None,updateBeliefs=True,debug={},threshold=None):
+             horizon=None,tiebreak=None,updateBeliefs=True,debug={},threshold=None, context=''):
         """
         The simulation method
         :param actions: optional argument setting a subset of actions to be performed in this turn
@@ -151,51 +151,47 @@ class World(object):
             state = copy.deepcopy(state)
         actions = act2dict(actions)
         # Determine the actions taken by the agents in this world
-        state,policies,choices = self.deltaAction(state,actions,horizon,tiebreak,keySubset,debug)
+        state,policies,choices = self.deltaAction(state,actions,horizon,tiebreak,keySubset,debug, context)
         # Compute the effect of the chosen actions
         effect = self.deltaState(choices,state,keySubset)
         # Update turn order
         effect.append(self.deltaTurn(state,policies))
         for stage in effect:
             state = self.applyEffect(state,stage,select)
-        assert state.is_minimal() 
         # The future becomes the present
         state.rollback()
-        assert state.is_minimal() 
         if updateBeliefs:
             # Update agent models included in the original world
             # (after finding out possible new worlds)
-            agentsModeled = [name for name in self.agents if modelKey(name) in state]
-            for name in agentsModeled:
+            if updateBeliefs is True:
+                agents_modeled = [name for name in self.agents if modelKey(name) in state]
+            else:
+                agents_modeled = updateBeliefs
+            for name in agents_modeled:
                 key = modelKey(name)
                 agent = self.agents[name]
                 if isinstance(agent.omega, list):
-                    substate = state.collapse(agent.omega+[key])
+                    substate = state.collapse(agent.omega+[key], False)
                 else:
                     substate = None
-                logging.info('{} observing {} worlds'.format(name, len(state.distributions[substate]) if substate is not None else 1))
 #                if substate is not None and len(state.distributions[substate]) > 8:
 #                    logging.info(state.distributions[substate].group_by_certainty(True))
-                agent.updateBeliefs(state, policies, horizon=horizon)
-                logging.info('{} updated   {} worlds'.format(name, len(state.distributions[substate]) if substate is not None else 1))
+                agent.updateBeliefs(state, policies, horizon=horizon, context=context)
                 if select and substate is not None:
                     state.distributions[substate].select(select == 'max')
             # The future becomes the present
             state.rollback()
-        assert state.is_minimal() 
 
         if select:
             state.select(select=='max')
-        assert state.is_minimal() 
         if threshold is not None:
             state.prune(threshold)
-        assert state.is_minimal() 
         if self.memory:
             self.history.append(copy.deepcopy(state))
            # self.modelGC(False)
         return state
 
-    def deltaAction(self,state=None,actions=None,horizon=None,tiebreak=None,keySubset=None,debug={}):
+    def deltaAction(self,state=None,actions=None,horizon=None,tiebreak=None,keySubset=None,debug={}, context=''):
         if state is None:
             state = self.state
         if keySubset is None:
@@ -221,7 +217,8 @@ class World(object):
                             choices[name] = {m[makeFuture(action)][CONSTANT] for m in policies[name].leaves()}
                     else:
                         agent = self.agents[name]
-                        decision = self.agents[name].decide(state,horizon,actions,None,tiebreak,None,debug=debug.get(name,{}))
+                        decision = self.agents[name].decide(state,horizon,actions,None,tiebreak,None,debug=debug.get(name,{}),
+                            context=context)
         #                                                    agent.getLegalActions(state),debug=debug.get(name,{}))
                         if name in debug:
                             debug[name]['__decision__'] = decision
@@ -1161,7 +1158,7 @@ class World(object):
             self.defineVariable(key,domain,lo,hi,description,combinator,substate,codePtr)
         return key
 
-    def setState(self, entity, feature, value, state=None, recurse=False):
+    def setState(self, entity, feature, value, state=None, noclobber=False, recurse=False):
         """
         For backward compatibility
         :param entity: the name of the entity whose state feature we're setting (does not have to be an agent)
@@ -1169,7 +1166,7 @@ class World(object):
         :type feature: str
         :param recurse: if True, set this feature to the given value for all agents' beliefs (and beliefs of beliefs, etc.)
         """
-        self.setFeature(stateKey(entity, feature), value, state, recurse)
+        self.setFeature(stateKey(entity, feature), value, state, noclobber, recurse)
 
     def getState(self,entity,feature,state=None,unique=False):
         """
@@ -1545,20 +1542,27 @@ class World(object):
                         for index in range(len(node['projection'])):
                             nodes.insert(index,node['projection'][index])
 
-    def resymbolize(self,state=None):
+    def resymbolize(self, state=None):
         if state is None:
             state = self.state
-        if isinstance(state,KeyedVector):
+        if isinstance(state, KeyedVector):
             return state.__class__({key: self.float2value(key,value) for key,value in state.items() if key != CONSTANT})
-        elif isinstance(state,VectorDistribution):
+        elif isinstance(state, VectorDistribution):
             return state.__class__({self.resymbolize(vector): prob for vector,prob in state.items()})
-        elif isinstance(state,VectorDistributionSet):
+        elif isinstance(state, VectorDistributionSet):
             result = state.__class__()
             for substate,distribution in state.distributions.items():
                 result.distributions[substate] = self.resymbolize(distribution)
                 for key in distribution.keys():
                     result.keyMap[key] = substate
             return result
+        elif isinstance(state, KeyedTree):
+            if state.isLeaf():
+                return self.resymbolize(state.getLeaf())
+            elif state.isProbabilistic():
+                raise NotImplementedError
+            else:
+                raise NotImplementedError
         else:
             raise NotImplementedError
 
