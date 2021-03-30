@@ -1,5 +1,6 @@
 from __future__ import print_function
 import copy
+import inspect
 import logging
 import math
 import multiprocessing
@@ -61,13 +62,13 @@ class Agent(object):
     """------------------"""
     """Policy methods"""
     """------------------"""
-    def compilePi(self,model=None,horizon=None,debug=False):
+    def compilePi(self, model=None, horizon=None, debug=False):
         if model is None:
             model = self.models['%s0' % (self.name)]
         else:
             model = self.models[model]
         if 'V' not in model or horizon not in model['V']:
-            self.compileV(model['name'],horizon,debug)
+            self.compileV(model['name'], horizon, debug)
         if horizon is None:
             exit()
         policy = None
@@ -85,79 +86,86 @@ class Agent(object):
             print(model['policy'][horizon])
         return model['policy'][horizon]
         
-    def compileV(self,model=None,horizon=None,debug=False):
+    def compileV(self, model=None, horizon=None, debug=False):
         self.world.dependency.getEvaluation()
         if model is None:
             model = self.models['%s0' % (self.name)]
         else:
             model = self.models[model]
-        belief = self.getBelief(self.world.state,model['name'])
+        belief = self.getBelief(self.world.state, model['name'])
         if horizon is None:
             horizon = self.getAttribute('horizon',model['name'])
+        else:
+            horizon = min(horizon, self.getAttribute('horizon',model['name']))
         R = self.getReward(model['name'])
         Rkey = rewardKey(self.name,True)
         actions = self.actions
         model['V'] = {}
-        turns = sorted([(belief[k].first(),k) for k in belief.keys() if isTurnKey(k)])
-        order = turns[:]
-        for i in range(len(order)-1):
-            assert order[i][0] < order[i+1][0],'Unable to project when actors act in parallel (%s and %s)' % \
-                (state2agent(order[i][1]),state2agent(order[i+1][1]))
-        while len(order) < horizon:
-            order += turns
-        order = [state2agent(entry[1]) for entry in order[:horizon]]
-        for t in reversed(range(len(order))):
-            subhorizon = len(order)-t
-            other = self.world.agents[order[t]]
-            if other.name == self.name:
-                model['V'][subhorizon] = {}
-                for action in actions:
-                    if debug: 
+        # Get the expected order of one round of other agents' turns in my forward projection
+        turns = {k: self.world.getFeature(k, belief, unique=True) for k in belief.keys() if isTurnKey(k)}
+        order = []
+        for other, turn in turns.items():
+            while len(order) <= turn:
+                order.append(set())
+            order[turn].add(state2agent(other))
+        # Concatenate rounds to fill out the turn order until it reaches my horizon of projection
+        sequence = []
+        while len(sequence) < horizon:
+            sequence += order
+        sequence = sequence[:horizon]
+        # Work our way through the projection
+        for t in reversed(range(len(sequence))):
+            # Everone's horizon is reduced by the amount of time already passed
+            subhorizon = len(sequence)-t
+            for other_name in sequence[t]:
+                other = self.world.agents[other_name]
+                if other.name == self.name:
+                    model['V'][subhorizon] = {}
+                    for action in actions:
+                        if debug: 
+                            print(action)
+                        effects = self.world.deltaState(action, belief, belief.keys())
+                        model['V'][subhorizon][action] = collapseDynamics(copy.deepcopy(R), effects)
+    #                    if debug: 
+    #                        print(model['V'][subhorizon][action])
+                    if t > 0:
+                        policy = self.compilePi(model['name'], subhorizon, debug)
+                        exit()
+                else:
+                    # Compile mental model of this agent's policy
+                    if debug:
+                        print('Compiling horizon %d policy for %s' % (subhorizon,other.name))
+                    if modelKey(other.name) in belief:
+                        mentalModel = self.world.getModel(other.name,belief)
+                        assert len(mentalModel) == 1,'Currently unable to compile policies for uncertain mental models'
+                        mentalModel = mentalModel.first()
+                    else:
+                        models = [model for model in other.models.keys() if 'modelOf' not in model]
+                        assert len(models) == 1,'Unable to compile policies without explicit mental model of %s' % (other.name)
+                        mentalModel = models[0]
+                    # Distinguish my belief about this model from other agent's true model
+                    mentalModel = other.addModel('%s_modelOf_%s' % (self.name,mentalModel),
+                                                 parent=mentalModel,static=True)
+                    if len(other.actions) > 1:
+                        # Possible decision
+                        if 'horizon' in mentalModel:
+                            subhorizon = min(mentalModel['horizon'],subhorizon)
+                        pi = other.compilePi(mentalModel['name'],subhorizon,debug)
+                        print(other.name,subhorizon)
+                        raise RuntimeError
+                    else:
+                        # Single action, no decision to be made
+                        action = next(iter(other.actions))
+                        effects = self.world.deltaState(action,belief,belief.keys())
+                        mentalModel['policy'] = {0: collapseDynamics(copy.deepcopy(R),effects)}
+                        self.world.setModel(other.name,mentalModel['name'],belief)
+                    if debug:
                         print(action)
-                    effects = self.world.deltaState(action,belief,belief.keys())
-                    model['V'][subhorizon][action] = collapseDynamics(copy.deepcopy(R),effects)
-#                    if debug: 
-#                        print(model['V'][subhorizon][action])
-                    if len(model['V'][subhorizon]) >= 3:
-                        break
-                if t > 0:
-                    policy = self.compilePi(model['name'],subhorizon,debug)
-                    exit()
-            else:
-                # Compile mental model of this agent's policy
-                if debug:
-                    print('Compiling horizon %d policy for %s' % (subhorizon,other.name))
-                if modelKey(other.name) in belief:
-                    mentalModel = self.world.getModel(other.name,belief)
-                    assert len(mentalModel) == 1,'Currently unable to compile policies for uncertain mental models'
-                    mentalModel = mentalModel.first()
-                else:
-                    models = [model for model in other.models.keys() if 'modelOf' not in model]
-                    assert len(models) == 1,'Unable to compile policies without explicit mental model of %s' % (other.name)
-                    mentalModel = models[0]
-                # Distinguish my belief about this model from other agent's true model
-                mentalModel = other.addModel('%s_modelOf_%s' % (self.name,mentalModel),
-                                             parent=mentalModel,static=True)
-                if len(other.actions) > 1:
-                    # Possible decision
-                    if 'horizon' in mentalModel:
-                        subhorizon = min(mentalModel['horizon'],subhorizon)
-                    pi = other.compilePi(mentalModel['name'],subhorizon,debug)
-                    print(other.name,subhorizon)
-                    raise RuntimeError
-                else:
-                    # Single action, no decision to be made
-                    action = next(iter(other.actions))
-                    effects = self.world.deltaState(action,belief,belief.keys())
-                    mentalModel['policy'] = {0: collapseDynamics(copy.deepcopy(R),effects)}
-                    self.world.setModel(other.name,mentalModel['name'],belief)
-                if debug:
-                    print(action)
-                    print(mentalModel['policy'])
+                        print(mentalModel['policy'])
         return model['V'][horizon]
                             
     def decide(self,state=None,horizon=None,others=None,model=None,selection=None,actions=None,
-               keySet=None,debug={}):
+               keySet=None,debug={}, context=''):
         """
         Generate an action choice for this agent in the given state
 
@@ -256,11 +264,13 @@ class Agent(object):
             raise RuntimeError(msg)
         elif len(actions) == 1:
             # Only one possible action
+            choice = next(iter(actions))
+            assert choice in self.getLegalActions(belief)
             if selection == 'distribution':
-                return {'action': Distribution({next(iter(actions)): 1.})}
+                return {'action': Distribution({choice: 1.})}
             else:
-                return {'action': next(iter(actions))}
-        logging.debug('%s deciding...' % (self.name))
+                return {'action': choice}
+        logging.debug('{} {} deciding among {}'.format(context, model, ', '.join([str(a) for a in sorted(actions)])))
         # Keep track of value function
         Vfun = self.getAttribute('V',model)
         if Vfun:
@@ -270,7 +280,7 @@ class Agent(object):
                 b = copy.deepcopy(belief)
                 b *= Vfun[action]
                 V[action] = {'__EV__': b[rewardKey(self.name,True)].expectation()}
-                logging.debug('Evaluated %s as %s (%d): %f' % (action, model, horizon, V[action]['__EV__']))
+                logging.debug('{} V_{}^{}({})={}'.format(context, model, horizon, action, V[action]['__EV__']))
         elif self.parallel:
             with multiprocessing.Pool() as pool:
                 results = [(action,pool.apply_async(self.value,
@@ -281,8 +291,8 @@ class Agent(object):
             # Compute values in sequence
             V = {}
             for action in actions:
-                V[action] = self.value(belief,action,model,horizon,others,keySet)
-                logging.debug('Evaluated %s as %s (%d): %f' % (action, model, horizon,V[action]['__EV__']))
+                V[action] = self.value(belief,action,model,horizon,others,keySet, context=context)
+                logging.debug('{} V_{}^{}({})={}'.format(context, model, horizon, action, V[action]['__EV__']))
         best = None
         for action in actions:
             # Determine whether this action is the best
@@ -315,17 +325,17 @@ class Agent(object):
             assert selection == 'consistent','Unknown action selection method: %s' % (selection)
             best.sort()
             result['action'] = best[0]
-        logging.debug('Choosing %s' % (result['action']))
+        logging.debug('{} Choosing {}'.format(context, result['action']))
         return result
 
     def value(self,belief,action,model,horizon=None,others=None,keySet=None,updateBeliefs=True,
-              debug={}):
+              debug={}, context=''):
         if horizon is None:
             horizon = self.getAttribute('horizon',model)
         if keySet is None:
             keySet = belief.keys()
         # Compute value across possible worlds
-        logging.debug('Considering %s as %s' % (action,model))
+        logging.debug('{} V_{}^{}({})=?'.format(context, model, horizon, action))
         current = copy.deepcopy(belief)
 #        if model:
 #            self.world.setFeature(modelKey(self.name),model,current)
@@ -358,7 +368,8 @@ class Agent(object):
                         actions[name] = start[name]
                         del start[name]
                 outcome = self.world.step(actions,current,keySubset=subkeys,horizon=horizon-t,
-                                          updateBeliefs=updateBeliefs,debug=debug)
+                                          updateBeliefs=updateBeliefs,debug=debug,
+                                          context='{} V_{}^{}({})'.format(context, model, t, action))
                 V['__ER__'].append(self.reward(current,model))
                 V['__EV__'] += V['__ER__'][-1]
                 V['__S__'].append(current)
@@ -1156,14 +1167,14 @@ class Agent(object):
                 world = beliefs # copy.deepcopy(beliefs)
             return world
 
-    def updateBeliefs(self,state=None,actions=set(),horizon=None):
+    def updateBeliefs(self,state=None,actions=set(),horizon=None, context=''):
         if state is None:
             state = self.world.state
         if isinstance(state,KeyedVector):
             model = self.stateEstimator(state,actions,horizon)
             vector[modelKey(self.name,True)] = self.world.value2float(modelKey(self.name),model)
         else:
-            self.updateBeliefsOLD(state,actions,horizon)
+            self.updateBeliefsOLD(state,actions,horizon, context=context)
 
     def stateEstimator(self,state,actions,horizon=None):
         if not isinstance(state,KeyedVector):
@@ -1255,7 +1266,7 @@ class Agent(object):
 #            newBelief = self.getBelief(model=newModel)
         return model
 
-    def updateBeliefsOLD(self, trueState=None, actions={}, horizon=None):
+    def updateBeliefsOLD(self, trueState=None, actions={}, max_horizon=None, context=''):
         """
         .. warning:: Even if this agent starts with ``True`` beliefs, its beliefs can deviate after actions with stochastic effects (i.e., the world transitions to a specific state with some probability, but the agent only knows a posterior distribution over that resulting state). If you want the agent's beliefs to stay correct, then set the ``static`` attribute on the model to ``True``.
 
@@ -1272,7 +1283,12 @@ class Agent(object):
         trueState.distributions[substate] = newDist
         for vector,prob in [(vector,oldDist[vector]) for vector in oldDist.domain()]:
             oldModel = self.world.float2value(oldModelKey,vector[oldModelKey])
-            logging.debug('{} updating beliefs {} under model {} (horizon={})'.format(self.name, str(vector), oldModel, horizon))
+            if max_horizon is None:
+                horizon = self.getAttribute('horizon', oldModel)
+            else:
+                horizon = max_horizon
+            logging.debug('{} {} updating |beliefs|={} under model {} (horizon={})'.format(context, self.name, 
+                len(vector), oldModel, horizon))
             if self.getAttribute('static',oldModel) is True or self.models[oldModel]['beliefs'] is True:
                 # My beliefs (and my current mental model) never change
                 newModel = oldModel
@@ -1288,14 +1304,18 @@ class Agent(object):
                         self.world.setFeature(key, vector[key], new_beliefs)
             else:
                 SE = self.models[oldModel]['SE']
-                logging.debug('SE({}): {}'.format(oldModel, SE))
+#                logging.debug('SE({}): {}'.format(oldModel, SE))
                 P = {} # self.models[oldModel]['transition']
-                # Identify label for overall observation
+#                # Identify label for overall observation
+#                for o in self.omega:
+#                    if o not in vector:
+#                        print(o, o in trueState.keys())
                 omega = tuple([vector[o] for o in self.omega])
                 if omega not in SE:
                     SE[omega] = {}
                 if self.name in actions:
-                    myAction = self.world.float2value(actionKey(self.name),vector[actionKey(self.name)])
+                    myAction = self.world.float2value(actionKey(self.name), vector[actionKey(self.name)])
+                    logging.debug('{} I perform {}'.format(context, myAction))
                 else:
                     myAction = None
                 if myAction not in SE[omega]:
@@ -1304,6 +1324,7 @@ class Agent(object):
                     newModel = SE[omega][myAction][horizon]
                     if newModel is None:
                         # Processing this somewhere above me in the recursion
+                        logging.warning('Recursive call... do nothing for now.')
                         newModel = oldModel
                 else:
                     # Work to be done. First, mark that we've started processing this transition
@@ -1312,8 +1333,10 @@ class Agent(object):
                     # Get old belief state.
                     beliefs = copy.deepcopy(original)
                     # Project direct effect of the actions, including possible observations
-                    outcome = self.world.step({self.name: myAction} if myAction else None,beliefs,
-                        keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=True)
+                    others = [name for name in self.world.agents if modelKey(name) in beliefs and name != self.name]
+                    outcome = self.world.step({self.name: myAction} if myAction else None, beliefs,
+                        keySubset=beliefs.keys(), horizon=horizon, updateBeliefs=others, 
+                        context=context+'updating {}\'s beliefs'.format(self.name))
                     # Condition on actual observations
                     for o in self.omega:
                         if o not in beliefs:
@@ -1327,8 +1350,8 @@ class Agent(object):
                                 continue
                             else:
                                 newModel = None
-                                logging.warning('%s (model %s) has impossible observation %s=%s when doing %s' % \
-                                              (self.name,oldModel,o,self.world.float2value(o,vector[o]),myAction))
+                                logging.warning(f'{context} {self.name} (model {oldModel}) has impossible observation {o}={self.world.float2value(o,vector[o])} when doing {myAction}')
+                                logging.warning(f'Possible observations are {self.world.getFeature(o, beliefs)}')
                                 if o in self.world.dynamics and myAction in self.world.dynamics[o]:
                                     logging.warning('Action effect is:\n%s' % (self.world.dynamics[o][myAction]))
                                     logging.warning('Believed values are:\n%s' % ('\n'.join(['\t%s: %s' % (k,self.world.getFeature(k,original))
@@ -1354,6 +1377,7 @@ class Agent(object):
                         if oldModelKey in self.omega:
                             # Observe this new model
                             self.world.setFeature(oldModelKey,newModel,beliefs)
+                        logging.debug('{} SE({}, {})={}'.format(context, myAction, horizon, newModel))
             # Insert new model into true state
             if isinstance(newModel,str):
                 vector[newModelKey] = self.world.value2float(oldModelKey,newModel)
