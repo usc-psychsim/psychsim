@@ -553,10 +553,10 @@ class KeyedTree:
             result.makeBranch(self.branch,{value: self.children[value].sample(mostlikely) for value in self.children})
         return result
         
-    def prune(self,path=[],variables={}):
+    def prune(self, path=[], variables={}):
         """
         Removes redundant branches
-        @warning: correct, but not necessarily complete
+        :warning: correct, but not necessarily complete
         """
         result = self.__class__()
         if self.isLeaf():
