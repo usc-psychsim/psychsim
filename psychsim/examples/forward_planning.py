@@ -1,7 +1,6 @@
 from psychsim.agent import Agent
 from psychsim.world import World
-from psychsim.helper_functions import multi_set_matrix, get_decision_info, explain_decisions
-from psychsim.pwl import makeTree, setToFeatureMatrix
+from psychsim.pwl import makeTree, setToFeatureMatrix, dynamicsMatrix, rewardKey
 from psychsim.reward import achieveFeatureValue, CONSTANT
 
 __author__ = 'Pedro Sequeira'
@@ -12,6 +11,7 @@ __description__ = 'Simple forward planning (discounted) example involving a sing
 
 # parameters
 MAX_HORIZON = 5
+MAX_STEPS = 3
 DISCOUNT = 0.9
 
 if __name__ == '__main__':
@@ -31,10 +31,10 @@ if __name__ == '__main__':
     tree = makeTree(setToFeatureMatrix(pos, pos))
     world.setDynamics(pos, action, tree)
     action = agent.addAction({'verb': 'move', 'action': 'left'})
-    tree = makeTree(multi_set_matrix(pos, {pos: 1, CONSTANT: -1}))
+    tree = makeTree(dynamicsMatrix(pos, {pos: 1, CONSTANT: -1}))
     world.setDynamics(pos, action, tree)
     action = agent.addAction({'verb': 'move', 'action': 'right'})
-    tree = makeTree(multi_set_matrix(pos, {pos: 1, CONSTANT: 1}))
+    tree = makeTree(dynamicsMatrix(pos, {pos: 1, CONSTANT: 1}))
     world.setDynamics(pos, action, tree)
 
     # define rewards (left always adds 1, right depends on position)
@@ -46,20 +46,25 @@ if __name__ == '__main__':
 
     world.setOrder([{agent.name}])
 
-    for i in range(MAX_HORIZON + 1):
+    true_model = agent.get_true_model()
+    for h in range(MAX_HORIZON + 1):
         print('====================================')
-        print('Horizon: {}'.format(str(i)))
+        print('Horizon: {}'.format(str(h)))
 
         # reset
         world.setFeature(pos, 0)
-        agent.setHorizon(i)
+        agent.setHorizon(h)
 
-        # single decision: left or right?
-        step = world.step()
-        # print(step)
-        print('Position: {}'.format(world.getValue(pos)))
-        # world.explain(step, level=3) # todo not working, cannot retrieve old 'outcomes' from step
+        for t in range(MAX_STEPS):
+            print('____________________________________')
+            print('Step: {}'.format(str(t)))
 
-        # print('\n')
-        # decision_infos = get_decision_info(step, agent.name) # todo cannot retrieve old 'outcomes' from step
-        # explain_decisions(agent.name, decision_infos)
+            # left or right?
+            debug = {agent.name: {}}
+            world.step(debug=debug)
+            action = debug[agent.name]['__decision__'][true_model]['action']
+            rwd = debug[agent.name]['__decision__'][true_model]['V'][action]['__ER__']
+            rwd = None if len(rwd) == 0 else rwd[0]
+            print('Position: {}'.format(world.getFeature(pos, unique=True)))
+            print('Reward from decision: {}'.format(rwd))
+            print('Reward from state: {}'.format(world.getFeature(rewardKey(agent.name), unique=True)))
