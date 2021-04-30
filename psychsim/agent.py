@@ -1289,7 +1289,8 @@ class Agent(object):
                 horizon = max_horizon
             logging.debug('{} {} updating |beliefs|={} under model {} (horizon={})'.format(context, self.name, 
                 len(vector), oldModel, horizon))
-            if self.getAttribute('static',oldModel) is True or self.models[oldModel]['beliefs'] is True:
+            if self.getAttribute('static',oldModel) is True or 'beliefs' not in self.models[oldModel] or \
+                self.models[oldModel]['beliefs'] is True:
                 # My beliefs (and my current mental model) never change
                 newModel = oldModel
             elif self.omega is True:
