@@ -1302,7 +1302,8 @@ class Agent(object):
                         newModel = self.belief2model(oldModel, new_beliefs)['name']
                         self.world.setFeature(oldModelKey, newModel, new_beliefs)
                     elif key != CONSTANT:
-                        self.world.setFeature(key, vector[key], new_beliefs)
+                        assert key not in new_beliefs
+                        new_beliefs.join(key, vector[key])
             else:
                 SE = self.models[oldModel]['SE']
 #                logging.debug('SE({}): {}'.format(oldModel, SE))
