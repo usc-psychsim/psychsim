@@ -1,9 +1,10 @@
+import logging
+import random
 from psychsim.agent import Agent
+from psychsim.helper_functions import set_illegal_action, set_legal_action
 from psychsim.probability import Distribution
 from psychsim.world import World
-from psychsim.pwl import makeTree, setToConstantMatrix
-from psychsim.helper_functions import multi_compare_row, set_constant_reward, set_illegal_action, set_legal_action, \
-    get_true_model_name
+from psychsim.pwl import makeTree, setToConstantMatrix, rewardKey, equalRow, equalFeatureRow, modelKey
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
@@ -13,50 +14,47 @@ __description__ = 'Example of how to set legality for agent\'s models in PsychSi
                   'reward. We create mental models of each agent and then add them to the other. Then we "remove" the' \
                   'right action of the *models* be setting it always illegal using the helper functions. This results' \
                   'in the agents always choosing to go right, because during ToM reasoning they believe that going ' \
-                  'left is the only option available to the other.'
+                  'left is the only option available to the other. Without this restriction, any combination is ' \
+                  'possible between the agents\' decisions because their models don\'t have preferences.'
 
 # parameters (positive reward if sides are different, otherwise punishment)
 DIFF_SIDES_RWD = 1
 SAME_SIDE_RWD = -1
+INVALID = 0
 
-NUM_STEPS = 4
+NUM_STEPS = 10
 TIEBREAK = 'random'  # when values of decisions are the same, choose randomly
 
-# action indexes
-NOT_DECIDED = 0
-WENT_LEFT = 1
-WENT_RIGHT = 2
+# decision labels
+NOT_DECIDED = 'none'
+WENT_LEFT = 'left'
+WENT_RIGHT = 'right'
+
+DEBUG = False
 
 
 def get_fake_model_name(agent):
-    return 'fake {} model'.format(agent.name)
+    return f'fake_{agent.name}_model'
 
 
 # defines reward tree
 def get_reward_tree(agent, my_side, other_side):
-    return makeTree({'if': multi_compare_row({my_side: 1}),  # if my_side >= 0
-                     True: {'if': multi_compare_row({my_side: -1}),  # if my_side == 0, did not yet decide
-                            True: set_constant_reward(agent, 0),
-                            False: {'if': multi_compare_row({my_side: 1, other_side: -1}),  # if my_side >= other_side
-                                    True: {'if': multi_compare_row({other_side: 1, my_side: -1}),
-                                           True: set_constant_reward(agent, SAME_SIDE_RWD),
-                                           False: set_constant_reward(agent, DIFF_SIDES_RWD)},
-                                    False: set_constant_reward(agent, DIFF_SIDES_RWD)}},
-                     False: set_constant_reward(agent, 0)})
-
-
-# gets a state description
-def get_state_desc(world, side):
-    result = world.getValue(side)
-    if result == NOT_DECIDED:
-        return 'N/A'
-    if result == WENT_LEFT:
-        return 'went left'
-    if result == WENT_RIGHT:
-        return 'went right'
+    reward_key = rewardKey(agent.name)
+    return makeTree({'if': equalRow(my_side, NOT_DECIDED),  # if I have not decided
+                     True: setToConstantMatrix(reward_key, INVALID),
+                     False: {'if': equalRow(other_side, INVALID),  # if other has not decided
+                             True: setToConstantMatrix(reward_key, INVALID),
+                             False: {'if': equalFeatureRow(my_side, other_side),  # if my_side == other_side
+                                     True: setToConstantMatrix(reward_key, SAME_SIDE_RWD),
+                                     False: setToConstantMatrix(reward_key, DIFF_SIDES_RWD)}}})
 
 
 if __name__ == '__main__':
+
+    random.seed(0)
+
+    # sets up log to screen
+    logging.basicConfig(format='%(message)s', level=logging.DEBUG if DEBUG else logging.INFO)
 
     # create world and add agents
     world = World()
@@ -77,7 +75,7 @@ if __name__ == '__main__':
         agent.setAttribute('selection', TIEBREAK)
 
         # add 'side chosen' variable (0 = didn't decide, 1 = went left, 2 = went right)
-        side = world.defineState(agent.name, 'side', int, lo=0, hi=2)
+        side = world.defineState(agent.name, 'side', list, [NOT_DECIDED, WENT_LEFT, WENT_RIGHT])
         world.setFeature(side, NOT_DECIDED)
         sides.append(side)
 
@@ -92,8 +90,8 @@ if __name__ == '__main__':
         world.setDynamics(side, action, tree)
         rights.append(action)
 
-        # create a mental model of the agent
-        agent.addModel(get_fake_model_name(agent), parent=get_true_model_name(agent))
+        # create a new model for the agent
+        agent.addModel(get_fake_model_name(agent), parent=agent.get_true_model())
 
     # defines payoff matrices
     agent1.setReward(get_reward_tree(agent1, sides[0], sides[1]), 1)
@@ -111,20 +109,22 @@ if __name__ == '__main__':
     set_illegal_action(agent1, rights[0], [get_fake_model_name(agent1)])
     set_illegal_action(agent2, rights[1], [get_fake_model_name(agent2)])
 
-    # ** unnecessary / just for illustration **: set left actions legal for both the agents and their models
-    set_legal_action(agent1, lefts[0], [get_true_model_name(agent1), get_fake_model_name(agent1)])
-    set_legal_action(agent2, lefts[1], [get_true_model_name(agent2), get_fake_model_name(agent2)])
+    # # ** unnecessary / just for illustration **: set left actions legal for both the agents and their models
+    # set_legal_action(agent1, lefts[0], [agent1.get_true_model(), get_fake_model_name(agent1)])
+    # set_legal_action(agent2, lefts[1], [agent2.get_true_model(), get_fake_model_name(agent2)])
 
-    for i in range(NUM_STEPS):
+    agent1.resetBelief(model=agent1.get_true_model())
+    agent1.resetBelief(model=get_fake_model_name(agent1))
+    agent2.resetBelief(model=agent2.get_true_model())
+    agent2.resetBelief(model=get_fake_model_name(agent2))
+
+    for t in range(NUM_STEPS):
         # reset decision
-        for j in range(len(agents)):
-            world.setFeature(sides[j], NOT_DECIDED)
+        for a in range(len(agents)):
+            world.setFeature(sides[a], NOT_DECIDED, recurse=True)
 
-        print('====================================')
-        print('Step {0}'.format(str(i)))
+        logging.info('====================================')
+        logging.info(f'Step {t}')
         step = world.step()
-        for j in range(len(agents)):
-            print('{0}: {1}'.format(agents[j].name, get_state_desc(world, sides[j])))
-
-        print('________________________________')
-        # world.explain(step, level=2) # todo step does not provide outcomes anymore
+        for a in range(len(agents)):
+            logging.info(f'{agents[a].name}: {world.getFeature(sides[a], unique=True)}')

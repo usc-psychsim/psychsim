@@ -1,8 +1,6 @@
-from psychsim.action import ActionSet
 from psychsim.agent import Agent
-from psychsim.helper_functions import multi_set_matrix, get_true_model_name
 from psychsim.probability import Distribution
-from psychsim.pwl import makeTree, CONSTANT, isStateKey, setToFeatureMatrix, actionKey
+from psychsim.pwl import makeTree, setToFeatureMatrix, actionKey, incrementMatrix
 from psychsim.reward import maximizeFeature
 from psychsim.world import World
 
@@ -37,10 +35,10 @@ if __name__ == '__main__':
     tree = makeTree(setToFeatureMatrix(pos, pos))
     world.setDynamics(pos, action, tree)
     action = agent.addAction({'verb': 'move', 'action': 'left'})
-    tree = makeTree(multi_set_matrix(pos, {pos: 1, CONSTANT: -1}))
+    tree = makeTree(incrementMatrix(pos, -1))
     world.setDynamics(pos, action, tree)
     action = agent.addAction({'verb': 'move', 'action': 'right'})
-    tree = makeTree(multi_set_matrix(pos, {pos: 1, CONSTANT: 1}))
+    tree = makeTree(incrementMatrix(pos, 1))
     world.setDynamics(pos, action, tree)
 
     # define rewards (maximize position, i.e., always go right)
@@ -71,5 +69,3 @@ if __name__ == '__main__':
         world.printBeliefs(agent.name)
         print('____________________________________')
 
-        # print step
-        # world.explain(step, level=2) # todo cannot retrieve old 'outcomes' from step
