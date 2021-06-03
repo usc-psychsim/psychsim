@@ -743,6 +743,8 @@ class VectorDistributionSet:
             del self.keyMap[future]
 
     def __eq__(self,other):
+        if not isinstance(other, VectorDistributionSet):
+            return False
         remaining = set(self.keyMap.keys())
         if remaining != set(other.keyMap.keys()):
             # The two do not even contain the same columns
