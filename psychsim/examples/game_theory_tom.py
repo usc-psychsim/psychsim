@@ -1,8 +1,7 @@
 import logging
 from psychsim.agent import Agent
-from psychsim.helper_functions import multi_compare_row, set_constant_reward, get_true_model_name
 from psychsim.probability import Distribution
-from psychsim.pwl import makeTree, equalRow, setToConstantMatrix
+from psychsim.pwl import makeTree, equalRow, setToConstantMatrix, rewardKey
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
@@ -15,10 +14,10 @@ __description__ = 'Example of using theory-of-mind in a game-theory scenario inv
 NUM_STEPS = 3
 TIEBREAK = 'random'  # when values of decisions are the same, choose randomly
 
-# action indexes
-NOT_DECIDED = 0
-WENT_STRAIGHT = 1
-SWERVED = 2
+# decision labels
+NOT_DECIDED = 'none'
+WENT_STRAIGHT = 'straight'
+SWERVED = 'swerved'
 
 # payoff parameters (according to PD)
 SUCKER = -1  # CD
@@ -32,29 +31,19 @@ DEBUG = False
 
 # defines a payoff matrix tree (0 = didn't decide, 1 = went straight, 2 = swerved)
 def get_reward_tree(agent, my_dec, other_dec):
-    return makeTree({'if': multi_compare_row({my_dec: 1}, NOT_DECIDED),  # if dec >= 0
-                     True: {'if': multi_compare_row({my_dec: -1}, NOT_DECIDED),  # if dec == 0, did not yet decide
-                            True: set_constant_reward(agent, INVALID),
-                            False: {'if': equalRow(my_dec, SWERVED),  # if dec >=2, I cooperated
-                                    True: {'if': equalRow(other_dec, SWERVED),  # if other cooperated
-                                           True: set_constant_reward(agent, MUTUAL_COOP),  # both cooperated
-                                           False: set_constant_reward(agent, SUCKER)},
-                                    False: {'if': equalRow(other_dec, SWERVED),
-                                            # if I defected and other cooperated
-                                            True: set_constant_reward(agent, TEMPTATION),
-                                            False: set_constant_reward(agent, PUNISHMENT)}}},  # both defected
-                     False: set_constant_reward(agent, INVALID)})  # invalid
-
-
-# gets a state description
-def get_state_desc(world, dec_feature):
-    decision = world.getValue(dec_feature)
-    if decision == NOT_DECIDED:
-        return 'N/A'
-    if decision == WENT_STRAIGHT:
-        return 'went straight'
-    if decision == SWERVED:
-        return 'swerved'
+    reward_key = rewardKey(agent.name)
+    return makeTree({'if': equalRow(my_dec, NOT_DECIDED),  # if I have not decided
+                     True: setToConstantMatrix(reward_key, INVALID),
+                     False: {'if': equalRow(other_dec, NOT_DECIDED),  # if other has not decided
+                             True: setToConstantMatrix(reward_key, INVALID),
+                             False: {'if': equalRow(my_dec, SWERVED),  # if I cooperated
+                                     True: {'if': equalRow(other_dec, SWERVED),  # if other cooperated
+                                            True: setToConstantMatrix(reward_key, MUTUAL_COOP),  # both cooperated
+                                            False: setToConstantMatrix(reward_key, SUCKER)},
+                                     False: {'if': equalRow(other_dec, SWERVED),
+                                             # if I defected and other cooperated
+                                             True: setToConstantMatrix(reward_key, TEMPTATION),
+                                             False: setToConstantMatrix(reward_key, PUNISHMENT)}}}})  # both defected
 
 
 if __name__ == '__main__':
@@ -76,10 +65,10 @@ if __name__ == '__main__':
         agent.setAttribute('discount', 1)
         agent.setAttribute('selection', TIEBREAK)
         agent.setHorizon(1)
-        agent.setRecursiveLevel(1)
+        # agent.setRecursiveLevel(1)
 
         # add "decision" variable (0 = didn't decide, 1 = went straight, 2 = swerved)
-        dec = world.defineState(agent.name, 'decision', int, lo=0, hi=2)
+        dec = world.defineState(agent.name, 'decision', list, [NOT_DECIDED, WENT_STRAIGHT, SWERVED])
         world.setFeature(dec, NOT_DECIDED)
         agents_dec.append(dec)
 
@@ -100,22 +89,14 @@ if __name__ == '__main__':
     world.setOrder(my_turn_order)
 
     # add true mental model of the other to each agent
-    world.setMentalModel(agent1.name, agent2.name, Distribution({get_true_model_name(agent2): 1}))
-    world.setMentalModel(agent2.name, agent1.name, Distribution({get_true_model_name(agent1): 1}))
+    world.setMentalModel(agent1.name, agent2.name, Distribution({agent2.get_true_model(): 1}))
+    world.setMentalModel(agent2.name, agent1.name, Distribution({agent1.get_true_model(): 1}))
 
     for i in range(NUM_STEPS):
 
         # decision per step (1 per agent): go straight or swerve?
         logging.info('====================================')
-        logging.info('Step {}'.format(i))
+        logging.info(f'Step {i}')
         step = world.step()
-        for j in range(len(agents)):
-            logging.info('{0}: {1}'.format(agents[j].name, get_state_desc(world, agents_dec[j])))
-
-        # print('________________________________')
-        # world.explain(step, level=2) # todo step does not provide outcomes anymore
-
-        # print('\n') #todo step does not provide outcomes anymore
-        # for i in range(len(agents)):
-        #     decision_infos = get_decision_info(step, agents[i].name)
-        #     explain_decisions(agents[i].name, decision_infos)
+        for a in range(len(agents)):
+            logging.info(f'{agents[a].name}: {world.getFeature(agents_dec[a], unique=True)}')

@@ -88,6 +88,7 @@ if __name__ == '__main__':
     # sets consumer belief that producer is at half-capacity, making it believe that asking more has more advantage
     # - in reality, producer is always at full capacity, so best strategy would be to always ask less
     ag_consumer.setBelief(var_half_cap, True)
+    ag_consumer.setAttribute('static', True)  # set to static so that beliefs never change (to their real value)
 
     total_rwd = 0
     for i in range(NUM_STEPS):

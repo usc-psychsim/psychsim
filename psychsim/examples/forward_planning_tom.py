@@ -1,8 +1,8 @@
 import logging
+import random
 from psychsim.agent import Agent
-from psychsim.helper_functions import multi_compare_row, set_constant_reward, get_true_model_name
 from psychsim.probability import Distribution
-from psychsim.pwl import makeTree, equalRow, setToConstantMatrix
+from psychsim.pwl import makeTree, equalRow, setToConstantMatrix, rewardKey
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
@@ -11,13 +11,13 @@ __description__ = 'Example of using theory-of-mind in a game-theory scenario inv
                   'version of the Prisoner\'s dilemma ' \
                   '(https://en.wikipedia.org/wiki/Prisoner%27s_dilemma#The_iterated_prisoner%27s_dilemma)' \
                   'Both agents follow a strategy inspired on tit-for-tat (https://en.wikipedia.org/wiki/Tit_for_tat)' \
-                  'Namely, the first action is open and depends on the ' \
-                  'beliefs of the agent about the other\'s behavior. From there on, retaliation is applied by always ' \
-                  'choosing defect after the first defection of the other agent (non-forgiving).' \
+                  'Namely, the first action is open and depends on the beliefs of the agent about the other\'s ' \
+                  'behavior. From there on, retaliation is applied by always choosing defect after the first defection ' \
+                  'of the other agent (non-forgiving).' \
                   'Hence the planning horizon has an influence on the agents\' decision to cooperate or defect:' \
                   '- if horizon is 0, first action for each agent will be random (0 reward), then tit-fot-tat' \
                   '- if horizon is 1, agents will always defect (one-shot decision, other\'s action does not matter' \
-                  '- if horizon is 2, first action for each agent will be random, because CC followed by CC = ' \
+                  '- if horizon is 2, first action for each agent will be random, because CC followed by CC == ' \
                   'DC followed by DD = -2, so C or D have the same value independently of the other; then tit-fot-tat' \
                   '- if horizon is >2, agents will always cooperate because they can see each other\'s tit-for-tat ' \
                   'strategy using ToM, and hence believe the other will cooperate if they also cooperate, leading to ' \
@@ -28,11 +28,12 @@ __description__ = 'Example of using theory-of-mind in a game-theory scenario inv
 MAX_HORIZON = 4
 NUM_STEPS = 4
 TIEBREAK = 'random'  # when values of decisions are the same, choose randomly
+SEED = 0
 
-# action indexes
-NOT_DECIDED = 0
-DEFECTED = 1
-COOPERATED = 2
+# decision labels
+NOT_DECIDED = 'none'
+DEFECTED = 'defected'
+COOPERATED = 'cooperated'
 
 # payoff parameters (according to PD)
 SUCKER = -3  # CD
@@ -46,31 +47,24 @@ DEBUG = False
 
 # defines a payoff matrix tree (0 = didn't decide, 1 = Defected, 2 = Cooperated)
 def get_reward_tree(agent, my_dec, other_dec):
-    return makeTree({'if': multi_compare_row({my_dec: 1}, NOT_DECIDED),  # if dec >= 0
-                     True: {'if': multi_compare_row({my_dec: -1}, NOT_DECIDED),  # if dec <= 0, did not yet decide
-                            True: set_constant_reward(agent, INVALID),
-                            False: {'if': equalRow(my_dec, COOPERATED),  # if dec >=2, I cooperated
-                                    True: {'if': equalRow(other_dec, COOPERATED),  # if other cooperated
-                                           True: set_constant_reward(agent, MUTUAL_COOP),  # both cooperated
-                                           False: set_constant_reward(agent, SUCKER)},
-                                    False: {'if': equalRow(other_dec, COOPERATED),
-                                            # if I defected and other cooperated
-                                            True: set_constant_reward(agent, TEMPTATION),
-                                            False: set_constant_reward(agent, PUNISHMENT)}}},  # both defected
-                     False: set_constant_reward(agent, INVALID)})  # invalid
-
-
-def get_state_desc(world, dec_feature):
-    decision = world.getValue(dec_feature)
-    if decision == NOT_DECIDED:
-        return 'N/A'
-    if decision == DEFECTED:
-        return 'defected'
-    if decision == COOPERATED:
-        return 'cooperated'
+    reward_key = rewardKey(agent.name)
+    return makeTree({'if': equalRow(my_dec, NOT_DECIDED),  # if I have not decided
+                     True: setToConstantMatrix(reward_key, INVALID),
+                     False: {'if': equalRow(other_dec, NOT_DECIDED),  # if other has not decided
+                             True: setToConstantMatrix(reward_key, INVALID),
+                             False: {'if': equalRow(my_dec, COOPERATED),  # if I cooperated
+                                     True: {'if': equalRow(other_dec, COOPERATED),  # if other cooperated
+                                            True: setToConstantMatrix(reward_key, MUTUAL_COOP),  # both cooperated
+                                            False: setToConstantMatrix(reward_key, SUCKER)},
+                                     False: {'if': equalRow(other_dec, COOPERATED),
+                                             # if I defected and other cooperated
+                                             True: setToConstantMatrix(reward_key, TEMPTATION),
+                                             False: setToConstantMatrix(reward_key, PUNISHMENT)}}}})
 
 
 if __name__ == '__main__':
+
+    random.seed(0)
 
     # sets up log to screen
     logging.basicConfig(format='%(message)s', level=logging.DEBUG if DEBUG else logging.INFO)
@@ -88,14 +82,14 @@ if __name__ == '__main__':
         # set agent's params
         agent.setAttribute('discount', 1)
         agent.setAttribute('selection', TIEBREAK)
-        agent.setRecursiveLevel(1)
+        # agent.setRecursiveLevel(1)
 
         # add "decision" variable (0 = didn't decide, 1 = Defected, 2 = Cooperated)
-        dec = world.defineState(agent.name, 'decision', int, lo=0, hi=2)
+        dec = world.defineState(agent.name, 'decision', list, [NOT_DECIDED, DEFECTED, COOPERATED])
         world.setFeature(dec, NOT_DECIDED)
         agents_dec.append(dec)
 
-    # define agents' actions inspired on tit-for-tat: first decision is open, then retaliate non-cooperation.
+    # define agents' actions inspired on TIT-FOR-TAT: first decision is open, then retaliate non-cooperation.
     # as soon as one agent defects it will always defect from there on
     for i, agent in enumerate(agents):
         my_dec = agents_dec[i]
@@ -130,34 +124,24 @@ if __name__ == '__main__':
     world.setOrder(my_turn_order)
 
     # add true mental model of the other to each agent
-    world.setMentalModel(agent1.name, agent2.name, Distribution({get_true_model_name(agent2): 1}))
-    world.setMentalModel(agent2.name, agent1.name, Distribution({get_true_model_name(agent1): 1}))
-
-    # save log
+    world.setMentalModel(agent1.name, agent2.name, Distribution({agent2.get_true_model(): 1}))
+    world.setMentalModel(agent2.name, agent1.name, Distribution({agent1.get_true_model(): 1}))
 
     for h in range(MAX_HORIZON + 1):
         logging.info('====================================')
-        logging.info('Horizon {}'.format(h))
+        logging.info(f'Horizon {h}')
 
         # set horizon (also to the true model!) and reset decisions
         for i in range(len(agents)):
             agents[i].setHorizon(h)
-            agents[i].setHorizon(h, get_true_model_name(agents[i]))
-            world.setFeature(agents_dec[i], NOT_DECIDED)
+            agents[i].setHorizon(h, agents[i].get_true_model())
+            world.setFeature(agents_dec[i], NOT_DECIDED, recurse=True)
 
         for t in range(NUM_STEPS):
 
             # decision per step (1 per agent): cooperate or defect?
             logging.info('---------------------')
-            logging.info('Step {}'.format(t))
+            logging.info(f'Step {t}')
             step = world.step()
             for i in range(len(agents)):
-                logging.info('{0}: {1}'.format(agents[i].name, get_state_desc(world, agents_dec[i])))
-
-            # print('________________________________')
-            # world.explain(step, level=2) # todo step does not provide outcomes anymore
-
-            # print('\n') #todo step does not provide outcomes anymore
-            # for i in range(len(agents)):
-            #     decision_infos = get_decision_info(step, agents[i].name)
-            #     explain_decisions(agents[i].name, decision_infos)
+                logging.info(f'{agents[i].name}: {world.getFeature(agents_dec[i], unique=True)}')
