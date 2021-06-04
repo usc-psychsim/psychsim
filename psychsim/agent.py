@@ -1125,9 +1125,10 @@ class Agent(object):
             self.world.setFeature(modelKey(self.name),model,beliefs)
         self.models[model]['beliefs'] = beliefs
         return beliefs
-        
-    def setRecursiveLevel(self,level,model=None):
-        raise DeprecationWarning('Setting level of recursion is no longer supported. Explicitly specify what the nested mental models are.')
+
+    def set_observations(self):
+        self.omega = [var for var in self.world.state.keys() if not isModelKey(var) and not isRewardKey(var)]
+        self.omega.append(modelKey(self.name))
 
     def setBelief(self,key,distribution,model=None,state=None):
         if state is None:
