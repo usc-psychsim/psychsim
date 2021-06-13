@@ -637,12 +637,12 @@ class VectorDistributionSet:
         else:
             raise NotImplementedError
 
-    def rollback(self):
+    def rollback(self, debug=False):
         """
         Removes any current state values and makes any future state values the current ones
+        :param debug: if True, then run some checks on the values
         """
         # What keys have both current and future values?
-        # TODO: Should be all of them when we're done with observations and models
         pairs = {k for k in self.keyMap if k != keys.CONSTANT and
                  not keys.isFuture(k) and keys.makeFuture(k) in self.keyMap}
         for now in pairs:
@@ -662,7 +662,7 @@ class VectorDistributionSet:
                     del vector[now]
                 if len(vector) > 1:
                     distribution.addProb(vector,prob)
-                elif len(vector) == 1:
+                elif len(vector) == 1 and debug:
                     assert next(iter(vector.keys())) == keys.CONSTANT
             if nowSub != futureSub:
                 # Kill two birds with two stones
@@ -677,19 +677,21 @@ class VectorDistributionSet:
                     del vector[future]
                     if len(vector) > 1:
                         distribution.addProb(vector,prob)
-                    elif len(vector) == 1:
+                    elif len(vector) == 1 and debug:
                         assert next(iter(vector.keys())) == keys.CONSTANT
-            assert now in self.keyMap
-            assert self.keyMap[now] in self.distributions,now
-        for s in self.distributions:
-            assert s in self.keyMap.values(),'Distribution %s is missing\n%s' % (s,self.distributions[s])
-            for k in self.distributions[s].keys():
-                assert not keys.isFuture(k),'Future key %s persists after rollback' \
-                    % (k)
-        for k,s in self.keyMap.items():
-            if k != keys.CONSTANT:
-                assert s in self.distributions,'%s: %s' % (k,s)
-            assert not keys.isFuture(k)
+            if debug:
+                assert now in self.keyMap
+                assert self.keyMap[now] in self.distributions,now
+        if debug:
+            for s in self.distributions:
+                assert s in self.keyMap.values(),'Distribution %s is missing\n%s' % (s,self.distributions[s])
+                for k in self.distributions[s].keys():
+                    assert not keys.isFuture(k),'Future key %s persists after rollback' \
+                        % (k)
+            for k,s in self.keyMap.items():
+                if k != keys.CONSTANT:
+                    assert s in self.distributions,'%s: %s' % (k,s)
+                assert not keys.isFuture(k)
 
     def simpleRollback(self,futures):
         # Make the future the present
