@@ -196,7 +196,6 @@ class Agent(object):
             except KeyError:
                 # Use real model as fallback?
                 model = self.world.getModel(self.name)
-        assert not model is True
         if isinstance(model,Distribution):
             result = {}
             tree = None
@@ -204,7 +203,7 @@ class Agent(object):
             myModel = keys.modelKey(self.name)
             for submodel in model.domain():
                 result[submodel] = self.decide(state,horizon,others,submodel,
-                                               selection,actions,keySet)
+                                               selection,actions,keySet, debug, context)
                 if isinstance(result[submodel]['action'],Distribution):
                     if len(result[submodel]['action']) > 1:
                         matrix = {'distribution': [(setToConstantMatrix(myAction,el),
@@ -291,7 +290,7 @@ class Agent(object):
             # Compute values in sequence
             V = {}
             for action in actions:
-                V[action] = self.value(belief,action,model,horizon,others,keySet, context=context)
+                V[action] = self.value(belief,action,model,horizon,others,keySet, debug=debug, context=context)
                 logging.debug('{} V_{}^{}({})={}'.format(context, model, horizon, action, V[action]['__EV__']))
         best = None
         for action in actions:
@@ -337,8 +336,6 @@ class Agent(object):
         # Compute value across possible worlds
         logging.debug('{} V_{}^{}({})=?'.format(context, model, horizon, action))
         current = copy.deepcopy(belief)
-#        if model:
-#            self.world.setFeature(modelKey(self.name),model,current)
         V_A = self.getAttribute('V',model)
         if V_A:
             current *= V_A[action]
@@ -348,7 +345,7 @@ class Agent(object):
                  '__ER__': [R],
                  '__EV__': R.expectation()}
         else:
-            V = {'__EV__': 0.,'__ER__': [],'__S__': []}
+            V = {'__EV__': 0.,'__ER__': [],'__S__': [current], '__t__': 0, '__A__': action}
             if isinstance(keySet,dict):
                 subkeys = keySet[action]
             else:
@@ -359,23 +356,34 @@ class Agent(object):
                 start = {}
             if action:
                 start[self.name] = action
-            for t in range(horizon):
-                logging.debug('Time %d/%d' % (t+1,horizon))
-                turn = self.world.next(current)
-                actions = {}
-                for name in turn:
-                    if name in start:
-                        actions[name] = start[name]
-                        del start[name]
-                outcome = self.world.step(actions,current,keySubset=subkeys,horizon=horizon-t,
-                                          updateBeliefs=updateBeliefs,debug=debug,
-                                          context='{} V_{}^{}({})'.format(context, model, t, action))
-                V['__ER__'].append(self.reward(current,model))
-                V['__EV__'] += V['__ER__'][-1]
-                V['__S__'].append(current)
-            V['__beliefs__'] = current
+            while V['__t__'] < horizon:
+                V = self.expand_value(V, start, model, subkeys, horizon, updateBeliefs, debug, context)
+            V['__beliefs__'] = V['__S__'][-1]
         return V
         
+    def expand_value(self, node, actions, model=None, subkeys=None, horizon=None, update_beliefs=True, debug={}, context=''):
+        """
+        Expands a given value node by a single step, updating the sequence of states and expected rewards accordingly
+        """
+        if debug.get('preserve_states', False):
+            node['__S__'].append(copy.deepcopy(node['__S__'][-1]))
+        current = node['__S__'][-1]
+        t = node['__t__']
+        logging.debug('Time %d/%d' % (t+1, horizon))
+        turn = self.world.next(current)
+        forced_actions = {}
+        for name in turn:
+            if name in actions:
+                forced_actions[name] = actions[name]
+                del actions[name]
+        outcome = self.world.step(forced_actions, current, keySubset=subkeys, horizon=horizon-t,
+                                  updateBeliefs=update_beliefs, debug=debug,
+                                  context='{} V_{}^{}({})'.format(context, model, t, node['__A__']))
+        node['__ER__'].append(self.reward(current, model))
+        node['__EV__'] += node['__ER__'][-1]
+        node['__t__'] += 1
+        return node
+
     def oldvalue(self,vector,action=None,horizon=None,others=None,model=None,keys=None):
         """
         Computes the expected value of a state vector (and optional action choice) to this agent
