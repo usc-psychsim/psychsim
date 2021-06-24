@@ -49,12 +49,30 @@ class KeyedPlane:
         self.isConjunction = True
 
     def __add__(self,other):
+        raise DeprecationWarning('Addition is ambiguous between con/disjunction. Replace with & or |, as desired.')
+
+    def __and__(self,other):
         """
         :warning: Does not check for duplicate planes
         """
-        assert self.isConjunction == other.isConjunction,'Planes must be both disjunctive or both conjunctive to be combined'
+        if len(self.planes) > 1:
+            assert self.isConjunction, f'Cannot conjoin disjunctive planes: {self}'
+        if len(other.planes) > 1:
+            assert other.isConjunction, f'Cannot conjoin disjunctive planes: {other}'
         result = self.__class__(self.planes+other.planes)
-        result.isConjunction = self.isConjunction
+        result.isConjunction = True
+        return result
+        
+    def __or__(self,other):
+        """
+        :warning: Does not check for duplicate planes
+        """
+        if len(self.planes) > 1:
+            assert not self.isConjunction, f'Cannot disjoin conjunctive planes: {self}'
+        if len(other.planes) > 1:
+            assert not other.isConjunction, f'Cannot disjoin conjunctive planes: {other}'
+        result = self.__class__(self.planes+other.planes)
+        result.isConjunction = False
         return result
     
     def keys(self):
@@ -190,9 +208,11 @@ class KeyedPlane:
                 return False
 
     def desymbolize(self,table,debug=False):
-        planes = [(p[0].desymbolize(table),self.desymbolizeThreshold(p[1],table),p[2])
+        planes = [(p[0].desymbolize(table), self.desymbolizeThreshold(p[1],table),p[2])
                   for p in self.planes]
-        return self.__class__(planes)
+        result = self.__class__(planes)
+        result.isConjunction = self.isConjunction
+        return result
 
     def desymbolizeThreshold(self,threshold,table):
         if isinstance(threshold,str):
