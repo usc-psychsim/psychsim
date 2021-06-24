@@ -65,9 +65,10 @@ def test_conjunction():
     world = setup_world()
     add_state(world)
     actions = add_actions(world,['Tom'])
-    tree = makeTree({'if': thresholdRow(stateKey('Tom','health'),50) + thresholdRow(stateKey('Jerry','health'),50),
+    tree = makeTree({'if': thresholdRow(stateKey('Tom','health'),50) & thresholdRow(stateKey('Jerry','health'),50),
         True: incrementMatrix(stateKey('Jerry','health'),-5),
         False: noChangeMatrix(stateKey('Jerry','health'))})
+    assert tree.branch.isConjunction
     world.setDynamics(stateKey('Jerry','health'),actions['hit'],tree)
     health = [world.getState('Jerry','health',unique=True)]
     world.step({'Tom': actions['hit']})
@@ -81,6 +82,30 @@ def test_conjunction():
     world.step({'Tom': actions['hit']})
     health.append(world.getState('Jerry','health',unique=True))
     assert health[-1] < health[-2]
+
+def test_disjunction():
+    delta = 5
+    threshold = 50
+    world = setup_world()
+    add_state(world)
+    actions = add_actions(world,['Tom'])
+    tree = makeTree({'if': thresholdRow(stateKey('Tom','health'), threshold) | thresholdRow(stateKey('Jerry','health'), threshold),
+        True: incrementMatrix(stateKey('Jerry','health'),-delta),
+        False: noChangeMatrix(stateKey('Jerry','health'))})
+    assert not tree.branch.isConjunction
+    world.setDynamics(stateKey('Jerry','health'),actions['hit'],tree)
+    health = [world.getState('Jerry','health',unique=True)]
+    world.step({'Tom': actions['hit']})
+    health.append(world.getState('Jerry','health',unique=True))
+    assert health[-1] == health[-2]
+    world.setState('Jerry','health', threshold+1)
+    world.step({'Tom': actions['hit']})
+    health.append(world.getState('Jerry','health',unique=True))
+    assert health[-1] == threshold-delta+1
+    world.setState('Tom','health', threshold+1)
+    world.step({'Tom': actions['hit']})
+    health.append(world.getState('Jerry','health',unique=True))
+    assert health[-1] == threshold-2*delta+1
 
 def test_greater_than():
     world = setup_world()
