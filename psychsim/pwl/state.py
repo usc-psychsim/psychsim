@@ -531,34 +531,38 @@ class VectorDistributionSet:
                     valSub = self.collapse(substates,False)
                 else:
                     valSub = None
-                assert len(other.branch.planes) == 1,'Currently unable to process conjunctive branches'
                 if valSub is None:
                     vector = KeyedVector({k: self.distributions[self.keyMap[k]].first()[k] \
                                           for k in branchKeys})
                     vector[keys.CONSTANT] = 1
                     self *= other.children[other.branch.evaluate(vector)]
                 else:
-                    assert len(other.branch.planes) == 1,'Unable to multiply by joint planes'
                     # Apply the test to this tree
-                    self *= other.branch.planes[0][0]
-                    valSub = self.keyMap[keys.VALUE]
-                    states = {}
-                    del self.keyMap[keys.VALUE]
-                    # Iterate through possible test results
-                    for vector in self.distributions[valSub].domain():
-                        prob = self.distributions[valSub][vector]
-                        del self.distributions[valSub][vector]
-                        test = other.branch.evaluate(vector[keys.VALUE])
-                        del vector[keys.VALUE]
-                        if test not in states:
-                            if states:
-                                states[test] = copy.deepcopy(self)
-                                states[test].distributions[valSub].clear()
-                            else:
-                                states[test] = self
-                                first = test
-                        if len(vector) > 1:
-                            states[test].distributions[valSub].addProb(vector,prob)
+                    break_if = not other.branch.isConjunction
+                    for plane in other.branch.planes:
+                        self *= plane[0]
+                        valSub = self.keyMap[keys.VALUE]
+                        states = {}
+                        del self.keyMap[keys.VALUE]
+                        break_now = True
+                        # Iterate through possible test results
+                        for vector in self.distributions[valSub].domain():
+                            prob = self.distributions[valSub][vector]
+                            del self.distributions[valSub][vector]
+                            test = other.branch.evaluate(vector[keys.VALUE])
+                            if test != break_if:
+                                break_now = False
+                            del vector[keys.VALUE]
+                            if test not in states:
+                                if states:
+                                    states[test] = copy.deepcopy(self)
+                                    states[test].distributions[valSub].clear()
+                                else:
+                                    states[test] = self
+                                    first = test
+                            if len(vector) > 1:
+                                states[test].distributions[valSub].addProb(vector,prob)
+                        if break_now: break
                     assert states,'Empty result of multiplication'
                     if len(self.distributions[valSub].domain()) == 0:
                         del self.distributions[valSub]
