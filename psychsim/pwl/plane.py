@@ -122,21 +122,21 @@ class KeyedPlane:
             else:
                 raise NotImplementedError('Not yet handling comparisons other than >, but it is really easy to do')
 
-    def evaluate(self,vector,index=None):
+    def evaluate(self,vector,p_index=None):
         """
         Tests whether the given vector passes or fails this test.
         Also accepts a numeric value, in lieu of doing a dot product.
-        :param index: evaluate against only the given plane (not all of them in case this is a con/disjunctive branch)
-        :type index: int
+        :param p_index: evaluate against only the given plane (not all of them in case this is a con/disjunctive branch)
+        :type p_index: int
         :rtype: bool
         :warning: If multiple planes are present, an AND over their results is assumed
         """
         result = None
-        if index is None:
+        if p_index is None:
             planes = self.planes
         else:
-            planes = [self.planes[index]]
-        for plane,threshold,comparison in self.planes:
+            planes = [self.planes[p_index]]
+        for plane,threshold,comparison in planes:
             if isinstance(vector,float):
                 total = vector
             else:
@@ -152,10 +152,10 @@ class KeyedPlane:
                     else:
                         return len(threshold)
                 elif total > threshold:
-                    if not self.isConjunction:
+                    if len(planes) > 0 and not self.isConjunction:
                         # Disjunction, so any positive result is sufficient
                         return True
-                elif self.isConjunction:
+                elif len(planes) > 0 and self.isConjunction:
                     # Conjunction, so any negative result is sufficient
                     return False
             elif comparison < 0:
@@ -166,10 +166,10 @@ class KeyedPlane:
                     else:
                         return len(threshold)
                 elif total < threshold:
-                    if not self.isConjunction:
+                    if len(planes) > 0 and not self.isConjunction:
                         # Disjunction, so any positive result is sufficient
                         return True
-                elif self.isConjunction:
+                elif len(planes) > 0 and self.isConjunction:
                     # Conjunction, so any negative result is sufficient
                     return False
             elif comparison == 0:
@@ -186,15 +186,15 @@ class KeyedPlane:
                             # Disjunction, so any positive result is sufficient
                             return True
                     else:
-                        if self.isConjunction:
+                        if len(planes) > 0 and self.isConjunction:
                             # Conjunction, so any negative result is sufficient
                             return False
                 else:
                     if abs(total-threshold) < plane.epsilon:
-                        if not self.isConjunction:
+                        if len(planes) > 0 and not self.isConjunction:
                             # Disjunction, so any positive result is sufficient
                             return True
-                    elif self.isConjunction:
+                    elif len(planes) > 0 and self.isConjunction:
                         # Conjunction, so any negative result is sufficient
                         return False
             else:
@@ -202,7 +202,7 @@ class KeyedPlane:
                 raise ValueError('Invalid comparison %s' % (comparison))
         else:
             # No planes matched
-            if self.isConjunction:
+            if len(planes) > 0 and self.isConjunction:
                 return True
             else:
                 return False
@@ -461,6 +461,12 @@ def trueRow(key):
     :rtype: L{KeyedPlane}
     """
     return thresholdRow(key,0.5)
+def falseRow(key):
+    """
+    :return: a plane testing whether a boolean keyed value is False
+    :rtype: L{KeyedPlane}
+    """
+    return KeyedPlane(KeyedVector({key: 1}), 0.5, -1)
 def andRow(trueKeys=[],falseKeys=[]):
     """
     :param trueKeys: list of keys which must be C{True} (default is empty list)
