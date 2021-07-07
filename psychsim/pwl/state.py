@@ -539,7 +539,7 @@ class VectorDistributionSet:
                 else:
                     # Apply the test to this tree
                     break_if = not other.branch.isConjunction
-                    for plane in other.branch.planes:
+                    for p_index, plane in enumerate(other.branch.planes):
                         self *= plane[0]
                         valSub = self.keyMap[keys.VALUE]
                         states = {}
@@ -549,7 +549,7 @@ class VectorDistributionSet:
                         for vector in self.distributions[valSub].domain():
                             prob = self.distributions[valSub][vector]
                             del self.distributions[valSub][vector]
-                            test = other.branch.evaluate(vector[keys.VALUE])
+                            test = other.branch.evaluate(vector[keys.VALUE], p_index)
                             if test != break_if:
                                 break_now = False
                             del vector[keys.VALUE]
