@@ -941,7 +941,29 @@ class Agent(object):
         :param unique: If True, assume there is a unique true model (default is True)
         :type unique: bool
         """
-        return self.world.getModel(self.name,unique=unique)
+        return self.world.getModel(self.name, unique=unique)
+
+    def zero_level(self, parent_model=None):
+        """
+        :rtype: str
+        """
+        if parent_model is None:
+            parent_model = self.get_true_model()
+        model = self.addModel(f'{parent_model}_zero', parent=parent_model, horizon=0)
+        belief = self.getBelief(model=parent_model)
+        ignore = set()
+        for k in belief.keys():
+            if isStateKey(k):
+                if state2agent(k) != self.name:
+                    ignore.add(k)
+            elif isBinaryKey(k):
+                relation = key2relation(k)
+                if relation['subject'] != self.name or relation['object'] != self.name:
+                    ignore.add(k)
+            else:
+                assert k == CONSTANT
+        self.create_belief_state(belief, model=model['name'], ignore=ignore)
+        return model['name']
 
     def deleteModel(self,name):
         """
@@ -1069,7 +1091,10 @@ class Agent(object):
     """Belief update methods"""
     """---------------------"""
 
-    def resetBelief(self,state=None,model=None,include=None,ignore=None,stateType=VectorDistributionSet):
+    def resetBelief(self, state=None, model=None, include=None, ignore=None, stateType=VectorDistributionSet):
+        return self.create_belief_state(state, model, include, ignore, stateType)
+
+    def create_belief_state(self, state=None, model=None, include=None, ignore=None, stateType=VectorDistributionSet):
         """
         Handles all combinations of state type and specified belief type
         """
@@ -1077,8 +1102,7 @@ class Agent(object):
         if state is None:
             state = self.world.state
         if model is None:
-            assert len(self.models) == 1,'Model is unspecified and ambiguous'
-            model = next(iter(self.models.keys()))
+            model = self.get_true_model(state)
         if isinstance(state,VectorDistributionSet):
             if issubclass(stateType,VectorDistributionSet):
                 beliefs = state.copySubset(ignore,include)
