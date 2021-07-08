@@ -542,12 +542,10 @@ class VectorDistributionSet:
                     states = {first: [self]}
                     for p_index, plane in enumerate(other.branch.planes):
                         for old_value, state_list in list(states.items()):
-                            print(f'{p_index} {old_value} {len(state_list)}')
                             if old_value != (not other.branch.isConjunction):
                                 # False (true) values don't need further tests for conjunctions (disjunctions)
                                 del states[old_value]
                                 for s in state_list:
-                                    print(f'Self: {s is self}')
                                     s *= plane[0]
                                     valSub = s.keyMap[keys.VALUE]
                                     del s.keyMap[keys.VALUE]
@@ -582,18 +580,13 @@ class VectorDistributionSet:
                         del states[first][0]
                     for test, state_list in states.items():
                         for s in state_list:
-                            print(s)
->>>>>>> Stashed changes
                             newKeys = set(other.getKeysOut())
 #                            assert len(s.distributions[valSub].domain()) > 0
                             s *= other.children[test]
                             substates = s.substate(other.children[test].keys(), True)
                             if substates:
                                 newSub = s.collapse(substates, False)
-                            print(newKeys|branchKeys)
                             newSub = self.update(s, newKeys|branchKeys)
-                            print(self.distributions[newSub])
-                    print(False in states)
         elif isinstance(other,KeyedVector):
             substates = self.substate(other)
             self.collapse(substates)
