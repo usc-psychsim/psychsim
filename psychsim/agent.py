@@ -951,18 +951,7 @@ class Agent(object):
             parent_model = self.get_true_model()
         model = self.addModel(f'{parent_model}_zero', parent=parent_model, horizon=0)
         belief = self.getBelief(model=parent_model)
-        ignore = set()
-        for k in belief.keys():
-            if isStateKey(k):
-                if state2agent(k) != self.name:
-                    ignore.add(k)
-            elif isBinaryKey(k):
-                relation = key2relation(k)
-                if relation['subject'] != self.name or relation['object'] != self.name:
-                    ignore.add(k)
-            else:
-                assert k == CONSTANT
-        self.create_belief_state(belief, model=model['name'], ignore=ignore)
+        self.create_belief_state(belief, model=model['name'])
         return model['name']
 
     def deleteModel(self,name):
