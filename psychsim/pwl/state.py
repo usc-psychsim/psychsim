@@ -543,6 +543,8 @@ class VectorDistributionSet:
                     for p_index, plane in enumerate(other.branch.planes):
                         for old_value, state_list in list(states.items()):
                             if old_value != (not other.branch.isConjunction):
+                                if old_value == first:
+                                    first = None
                                 # False (true) values don't need further tests for conjunctions (disjunctions)
                                 del states[old_value]
                                 for s in state_list:
@@ -567,8 +569,6 @@ class VectorDistributionSet:
                                         if len(vector) > 1:
                                             states[test][-1].distributions[valSub].addProb(vector, prob)
                     assert states, 'Empty result of multiplication'
-#                    if len(self.distributions[valSub].domain()) == 0:
-#                        del self.distributions[valSub]
                     for test in states:
                         if test not in other.children:
                             if test is None:
@@ -832,7 +832,7 @@ class VectorDistributionSet:
                     (key,vector,distribution[vector]*100)
                 for other in vector:
                     assert other == keys.CONSTANT or self.keyMap[other] == self.keyMap[key] ,\
-                        'Unmapped key %s is in vector\n\%s' % (other,vector)
+                        f'Unmapped key {other} is in vector\n{vector}'
             if sumToOne:
                 assert (sum(distribution.values())-1)<.000001,'Distribution sums to %4.2f' % \
                     (sum(distribution.values()))

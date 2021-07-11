@@ -83,7 +83,7 @@ def test_conjunction():
     health.append(world.getState('Jerry','health',unique=True))
     assert health[-1] < health[-2]
 
-def dont_test_disjunction():
+def test_disjunction():
     delta = 5
     threshold = 50
     world = setup_world()
