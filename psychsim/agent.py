@@ -949,9 +949,7 @@ class Agent(object):
         """
         if parent_model is None:
             parent_model = self.get_true_model()
-        model = self.addModel(f'{parent_model}_zero', parent=parent_model, horizon=0)
-        belief = self.getBelief(model=parent_model)
-        self.create_belief_state(belief, model=model['name'])
+        model = self.addModel(f'{parent_model}_zero', parent=parent_model, horizon=0, beliefs=True, static=True)
         return model['name']
 
     def deleteModel(self,name):
