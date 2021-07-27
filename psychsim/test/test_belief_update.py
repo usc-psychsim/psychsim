@@ -65,23 +65,33 @@ def test_conjunction():
     world = setup_world()
     add_state(world)
     actions = add_actions(world,['Tom'])
-    tree = makeTree({'if': thresholdRow(stateKey('Tom','health'),50) & thresholdRow(stateKey('Jerry','health'),50),
-        True: incrementMatrix(stateKey('Jerry','health'),-5),
-        False: noChangeMatrix(stateKey('Jerry','health'))})
+    tree = makeTree({'if': thresholdRow(stateKey('Tom', 'health'), 50) & thresholdRow(stateKey('Jerry', 'health'), 50),
+        True: incrementMatrix(stateKey('Jerry', 'health'), -5),
+        False: noChangeMatrix(stateKey('Jerry', 'health'))})
     assert tree.branch.isConjunction
-    world.setDynamics(stateKey('Jerry','health'),actions['hit'],tree)
-    health = [world.getState('Jerry','health',unique=True)]
+    world.setDynamics(stateKey('Jerry', 'health'), actions['hit'], tree)
+    health = [world.getState('Jerry', 'health',unique=True)]
     world.step({'Tom': actions['hit']})
-    health.append(world.getState('Jerry','health',unique=True))
+    health.append(world.getState('Jerry', 'health',unique=True))
     assert health[-1] == health[-2]
-    world.setState('Tom','health',51)
+    world.setState('Tom','health', 51)
     world.step({'Tom': actions['hit']})
-    health.append(world.getState('Jerry','health',unique=True))
+    health.append(world.getState('Jerry', 'health',unique=True))
     assert health[-1] == health[-2]
-    world.setState('Jerry','health',51)
+    world.setState('Jerry','health', 51)
     world.step({'Tom': actions['hit']})
-    health.append(world.getState('Jerry','health',unique=True))
+    health.append(world.getState('Jerry', 'health',unique=True))
     assert health[-1] < health[-2]
+
+    hi = 75
+    hi_prob = 0.25
+    world.setState('Tom', 'health', Distribution({hi: hi_prob, 100-hi: 1-hi_prob}))
+    world.setState('Jerry', 'health', Distribution({hi: hi_prob, 100-hi: 1-hi_prob}))
+    world.step({'Tom': actions['hit']})
+    dist = world.getState('Jerry', 'health')
+    assert dist[hi-5] == hi_prob**2
+    assert dist[hi] == hi_prob*(1-hi_prob)
+    assert dist[100-hi] == 1-hi_prob
 
 def test_disjunction():
     delta = 5
