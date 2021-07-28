@@ -123,7 +123,7 @@ class DependencyGraph(dict):
             if name in self:
                 agent = self.world.agents[name]
                 # Create links from reward
-                model = '%s0' % (agent.name)
+                model = agent.get_true_model() #self'%s0' % (agent.name)
                 R = agent.getReward(model)
                 for parent in R.getKeysIn() - set([CONSTANT]):
                     if isStateKey(parent) and not state2agent(parent) in agents:
