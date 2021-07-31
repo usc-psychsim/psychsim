@@ -37,11 +37,11 @@ def add_actions(world,order=None):
     return actions
 
 def add_dynamics(world,actions):
-    tree = makeTree({'distribution': [(approachMatrix(stateKey('Jerry','health'),0,.1),0.5),
-                                    (noChangeMatrix(stateKey('Jerry','health')),0.5)]})
+    tree = makeTree({'distribution': [(approachMatrix(stateKey('Jerry','health'), .1, 0), 0.5),
+                                    (noChangeMatrix(stateKey('Jerry','health')), 0.5)]})
     world.setDynamics(stateKey('Jerry','health'),actions['hit'],tree)
-    tree = makeTree({'distribution': [(approachMatrix(stateKey('Tom','health'),0,.1),0.5),
-                                    (noChangeMatrix(stateKey('Tom','health')),0.5)]})
+    tree = makeTree({'distribution': [(approachMatrix(stateKey('Tom','health'), .1, 0), 0.5),
+                                    (noChangeMatrix(stateKey('Tom','health')),  0.5)]})
     world.setDynamics(stateKey('Tom','health'),actions['hit'],tree)
 
 
@@ -58,8 +58,23 @@ def add_models(world,rationality=1.):
 
 def add_beliefs(world):
     for agent in world.agents.values():
-        agent.resetBelief()
+        agent.create_belief_state()
         agent.set_observations()
+
+def test_dynamics():
+    world = setup_world()
+    add_state(world)
+    actions = add_actions(world,['Tom'])
+    add_dynamics(world, actions)
+    health = [world.getState('Jerry', 'health', unique=True)]
+    world.step({'Tom': actions['hit']})
+    health.append(world.getState('Jerry', 'health'))
+    assert len(health[1]) == 2
+    assert health[1][health[0]] == 0.5
+    assert health[1][.9*health[0]] == 0.5
+    # No null subdistributions in state
+    for dist in world.state.distributions.values():
+        assert len(dist) > 0
 
 def test_conjunction():
     world = setup_world()
@@ -74,24 +89,33 @@ def test_conjunction():
     world.step({'Tom': actions['hit']})
     health.append(world.getState('Jerry', 'health',unique=True))
     assert health[-1] == health[-2]
+    for dist in world.state.distributions.values():
+        assert len(dist) > 0
     world.setState('Tom','health', 51)
     world.step({'Tom': actions['hit']})
     health.append(world.getState('Jerry', 'health',unique=True))
     assert health[-1] == health[-2]
+    for dist in world.state.distributions.values():
+        assert len(dist) > 0
     world.setState('Jerry','health', 51)
     world.step({'Tom': actions['hit']})
     health.append(world.getState('Jerry', 'health',unique=True))
     assert health[-1] < health[-2]
+    for dist in world.state.distributions.values():
+        assert len(dist) > 0
 
     hi = 75
+    lo = 25
     hi_prob = 0.25
-    world.setState('Tom', 'health', Distribution({hi: hi_prob, 100-hi: 1-hi_prob}))
-    world.setState('Jerry', 'health', Distribution({hi: hi_prob, 100-hi: 1-hi_prob}))
+    world.setState('Tom', 'health', Distribution({hi: hi_prob, lo: 1-hi_prob}))
+    world.setState('Jerry', 'health', Distribution({hi: hi_prob, lo: 1-hi_prob}))
     world.step({'Tom': actions['hit']})
     dist = world.getState('Jerry', 'health')
     assert dist[hi-5] == hi_prob**2
     assert dist[hi] == hi_prob*(1-hi_prob)
-    assert dist[100-hi] == 1-hi_prob
+    assert dist[lo] == 1-hi_prob
+    for dist in world.state.distributions.values():
+        assert len(dist) > 0
 
 def test_disjunction():
     delta = 5
@@ -117,7 +141,7 @@ def test_disjunction():
     health.append(world.getState('Jerry','health',unique=True))
     assert health[-1] == threshold-2*delta+1
 
-def dont_test_greater_than():
+def test_greater_than():
     world = setup_world()
     add_state(world)
     actions = add_actions(world,['Tom'])
@@ -145,3 +169,15 @@ def dont_test_belief_update():
     world.setMentalModel('Jerry','Tom',Distribution({'friend': 0.5,'foe': 0.5}))
 
     world.step()
+
+def test_zero_level():
+    world = setup_world()
+    add_state(world)
+    actions = add_actions(world)
+    add_dynamics(world,actions)
+    add_reward(world)
+    jerry = world.agents['Jerry']
+    jerry0 = jerry.zero_level()
+    R = jerry.getReward(jerry.get_true_model())   
+    R0 = jerry.getReward(jerry0)
+    assert R == R0 
