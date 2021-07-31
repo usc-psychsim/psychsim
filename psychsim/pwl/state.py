@@ -31,6 +31,24 @@ class VectorDistributionSet:
         elif node is not None:
             raise TypeError('Unknown argument type for constructor: {}'.format(type(node).__name__))
 
+    def add_distribution(self, dist):
+        """
+        :param dist: The sub-distribution to add to this state
+        :type dist: VectorDistribution
+        :warning: Keys in new distribution must not already exist in current distribution
+        :return: the index into the newly added distribution
+        """
+        for key in dist.keys():
+            if key in self:
+                raise ValueError(f'Cannot add distribution containing {key}, because it already exists')
+        substate = 0
+        while substate in self.distributions:
+            substate += 1
+        for key in dist.keys():
+            self.keyMap[key] = substate
+        self.distributions[substate] = dist
+        return substate
+
     def keys(self):
         return self.keyMap.keys()
 
@@ -543,6 +561,7 @@ class VectorDistributionSet:
                     for p_index, plane in enumerate(other.branch.planes):
                         for old_value, state_list in list(states.items()):
                             if old_value != (not other.branch.isConjunction):
+                                # Ignore entries already True (if disjunction) or False (if conjunction)
                                 if old_value == first:
                                     first = None
                                 # False (true) values don't need further tests for conjunctions (disjunctions)
@@ -568,6 +587,8 @@ class VectorDistributionSet:
                                             states[test][-1].distributions[valSub].clear()
                                         if len(vector) > 1:
                                             states[test][-1].distributions[valSub].addProb(vector, prob)
+                                    if len(s.distributions[valSub]) == 0:
+                                        del s.distributions[valSub]
                     assert states, 'Empty result of multiplication'
                     for test in states:
                         if test not in other.children:
@@ -575,13 +596,12 @@ class VectorDistributionSet:
                                 logging.error('Missing fallback branch in tree:\n%s' % (str(other)))
                             else:
                                 logging.error('Missing branch for value %s in tree:\n%s' % (test, str(other)))
+                    newKeys = set(other.getKeysOut())
                     if first in states and states[first][0] is self:
                         self *= other.children[first]
                         del states[first][0]
                     for test, state_list in states.items():
                         for s in state_list:
-                            newKeys = set(other.getKeysOut())
-#                            assert len(s.distributions[valSub].domain()) > 0
                             s *= other.children[test]
                             substates = s.substate(other.children[test].keys(), True)
                             if substates:
