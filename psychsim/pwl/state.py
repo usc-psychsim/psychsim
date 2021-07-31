@@ -556,14 +556,14 @@ class VectorDistributionSet:
                     self *= other.children[other.branch.evaluate(vector)]
                 else:
                     # Apply the test to this tree
-                    first = None
+                    first = '__null__'
                     states = {first: [self]}
                     for p_index, plane in enumerate(other.branch.planes):
                         for old_value, state_list in list(states.items()):
                             if old_value != (not other.branch.isConjunction):
                                 # Ignore entries already True (if disjunction) or False (if conjunction)
                                 if old_value == first:
-                                    first = None
+                                    first = '__null__'
                                 # False (true) values don't need further tests for conjunctions (disjunctions)
                                 del states[old_value]
                                 for s in state_list:
@@ -576,7 +576,7 @@ class VectorDistributionSet:
                                         del s.distributions[valSub][vector]
                                         test = other.branch.evaluate(vector[keys.VALUE], p_index)
                                         del vector[keys.VALUE]
-                                        if s is self and first is None:
+                                        if s is self and first == '__null__':
                                             first = test
                                             states[first] = [s]
                                         else:
@@ -596,17 +596,17 @@ class VectorDistributionSet:
                                 logging.error('Missing fallback branch in tree:\n%s' % (str(other)))
                             else:
                                 logging.error('Missing branch for value %s in tree:\n%s' % (test, str(other)))
-                    newKeys = set(other.getKeysOut())
                     if first in states and states[first][0] is self:
                         self *= other.children[first]
                         del states[first][0]
+                    new_keys = set(other.getKeysOut())
                     for test, state_list in states.items():
                         for s in state_list:
                             s *= other.children[test]
                             substates = s.substate(other.children[test].keys(), True)
                             if substates:
                                 newSub = s.collapse(substates, False)
-                            newSub = self.update(s, newKeys|branchKeys)
+                            newSub = self.update(s, new_keys|branchKeys)
         elif isinstance(other,KeyedVector):
             substates = self.substate(other)
             self.collapse(substates)
