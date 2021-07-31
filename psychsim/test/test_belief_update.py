@@ -76,6 +76,22 @@ def test_dynamics():
     for dist in world.state.distributions.values():
         assert len(dist) > 0
 
+def test_default_branch():
+    world = setup_world()
+    add_state(world)
+    mood = world.defineState('Tom', 'mood', list, ['happy', 'neutral', 'sad', 'angry'])
+    world.setFeature(mood, 'angry')
+    actions = add_actions(world,['Tom'])
+    tree = makeTree({'if': equalRow(mood, ['happy', 'neutral']),
+        0: incrementMatrix(stateKey('Tom', 'health'), 1),
+        1: noChangeMatrix(stateKey('Tom', 'health')),
+        None: incrementMatrix(stateKey('Tom', 'health'), -1)})
+    world.setDynamics(stateKey('Tom', 'health'), actions['hit'], tree)
+    health = [world.getState('Tom', 'health',unique=True)]
+    world.step({'Tom': actions['hit']})
+    health.append(world.getState('Tom', 'health',unique=True))
+    assert health[-1] == health[-2] - 1
+
 def test_conjunction():
     world = setup_world()
     add_state(world)
