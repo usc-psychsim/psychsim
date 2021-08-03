@@ -814,17 +814,17 @@ class VectorDistributionSet:
         return '%s\n%s' % (vector.sortedString(),'\n---\n'.join([str(dist) for dist in self.distributions.values() 
             if len(dist) > 1]))
 
-    def copySubset(self,ignore=None,include=None):
+    def copySubset(self, ignore=None, include=None):
         result = self.__class__()
-        if include is None:
-            if ignore is None:
+        if ignore is None and include is None:
+                # Ignoring nothing, including everything, so this is just a copy
                 return self.__deepcopy__({})
-            else:
-                keySubset = {k for k in self.keys() if not k in ignore}
-        elif ignore is None:
+        if include is None:
+            include = set(self.keys())
+        if ignore is None:
             keySubset = include
         else:
-            raise RuntimeError('Use either ignore or include sets, but not both')
+            keySubset = include - ignore
         for key in keySubset:
             if key not in result and key in self:
                 distribution = self.distributions[self.keyMap[key]]
