@@ -1090,6 +1090,10 @@ class Agent(object):
             state = self.world.state
         if model is None:
             model = self.get_true_model(state)
+        if ignore is None:
+            ignore = set()
+        if include is None:
+            include = state.keys()
         if isinstance(state,VectorDistributionSet):
             if issubclass(stateType,VectorDistributionSet):
                 beliefs = state.copySubset(ignore,include)
@@ -1103,10 +1107,6 @@ class Agent(object):
                 for vector in state:
                     beliefs.addProb(KeyedVector({key: vector[key] for key in include if key not in ignore}),prob)
         elif isinstance(state,KeyedVector):
-            if ignore is None:
-                ignore = set()
-            if include is None:
-                include = state.keys()
             if issubclass(stateType,KeyedVector):
                 beliefs = stateType({key: state[key] for key in include if key not in ignore})
             elif issubclass(stateType,VectorDistribution):
@@ -1118,10 +1118,6 @@ class Agent(object):
                     if key not in ignore:
                         beliefs.join(key,state[key])
         else:
-            if ignore is None:
-                ignore = set()
-            if include is None:
-                include = state.keys()
             assert issubclass(state.__class__,VectorDistribution),'Unable to extract beliefs from state of type %s ' % (stateType.__name__)
             if issubclass(stateType,VectorDistributionSet):
                 dist = state.__class__()
@@ -1145,8 +1141,16 @@ class Agent(object):
         self.models[model]['beliefs'] = beliefs
         return beliefs
 
-    def set_observations(self):
-        self.omega = [var for var in self.world.state.keys() if not isModelKey(var) and not isRewardKey(var)]
+    def set_fully_observable(self):
+        """
+        Helper method that sets up observations for this agent so that it observes everything (within reason)
+        """
+        return self.set_observations(set())
+
+    def set_observations(self, unobservable=None):
+        if unobservable is None:
+            unobservable = set()
+        self.omega = [var for var in self.world.state.keys() if not isModelKey(var) and not isRewardKey(var) and var not in unobservable]
         self.omega.append(modelKey(self.name))
 
     def setBelief(self,key,distribution,model=None,state=None):
