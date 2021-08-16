@@ -283,6 +283,11 @@ class KeyedVector(collections.abc.MutableMapping):
         return hash(tuple(self._data.items()))
 #        return hash(frozenset(self._data.items()))
 
+    def diff(self, other):
+        my_keys = set(self.keys())
+        yr_keys = set(other.keys())
+        return sorted((my_keys-yr_keys)|(yr_keys-my_keys)|{k for k in my_keys&yr_keys if self[k] != other[k]})
+
 class VectorDistribution(Distribution):
     """
     A class representing a L{Distribution} over L{KeyedVector} instances
