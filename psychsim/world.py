@@ -174,9 +174,8 @@ class World(object):
                     substate = state.collapse(agent.omega+[key], False)
                 else:
                     substate = None
-#                if substate is not None and len(state.distributions[substate]) > 8:
-#                    logging.info(state.distributions[substate].group_by_certainty(True))
                 agent.updateBeliefs(state, policies, horizon=horizon, context=context)
+                substate = state.keyMap[makeFuture(key)]
                 if select and substate is not None:
                     state.distributions[substate].select(select == 'max')
             # The future becomes the present
@@ -392,7 +391,7 @@ class World(object):
     """Authoring methods"""
     """-----------------"""
 
-    def addAgent(self,agent,setModel=True):
+    def addAgent(self, agent, setModel=True, avoid_beliefs=True):
         if isinstance(agent,str):
             agent = Agent(agent)
         if self.has_agent(agent):
@@ -402,7 +401,7 @@ class World(object):
             agent.world = self
             key = modelKey(agent.name)
             if not key in self.variables:
-                self.defineVariable(key,list,list(agent.models.keys()))
+                self.defineVariable(key, list, list(agent.models.keys()), avoid_beliefs=avoid_beliefs)
             
             if len(agent.models) == 0:
                 # Default model settings
@@ -857,7 +856,7 @@ class World(object):
     """-------------"""
 
     def defineVariable(self,key,domain=float,lo=0.,hi=1.,description=None,
-                       combinator=None,substate=None,codePtr=False):
+                       combinator=None,substate=None,codePtr=False, avoid_beliefs=True):
         """
         Define the type and domain of a given element of the state vector
 
@@ -880,11 +879,12 @@ class World(object):
         :param combinator: how should multiple dynamics for this variable be combined
         :param substate: name of independent state subvector this variable belongs to
         """
-        for agent in self.agents.values():
-            for model in agent.models.values():
-                if 'beliefs' in model and not model['beliefs'] is True:
-                    raise RuntimeError('Define all variables before setting beliefs (%s:%s)' \
-                                       % (agent.name,model['name']))
+        if avoid_beliefs:
+            for agent in self.agents.values():
+                for model in agent.models.values():
+                    if 'beliefs' in model and not model['beliefs'] is True:
+                        raise RuntimeError('Define all variables before setting beliefs (%s:%s)' \
+                                           % (agent.name,model['name']))
         if key in self.variables:
             raise NameError('Variable %s already defined' % (key))
         if key[-1] == "'":
@@ -993,7 +993,7 @@ class World(object):
         if recurse:
             for name, models in self.get_current_models(state).items():
                 for model in models:
-                    beliefs = self.agents[name].models[model]['beliefs']
+                    beliefs = self.agents[name].models[model].get('beliefs', True)
                     if beliefs is not True and key in beliefs:
                         self.setFeature(key, value, beliefs, noclobber)
 
@@ -1236,7 +1236,7 @@ class World(object):
                 all_models |= models
                 result[name] = result.get(name, set()) | models
                 for model in models - cycles:
-                    if self.agents[name].models[model]['beliefs'] is not True:
+                    if self.agents[name].models[model].get('beliefs', True) is not True:
                         beliefs = self.agents[name].getBelief(model=model)
                         new_models = self.get_current_models(beliefs, cycle_check, all_models)
                         for sub_name, sub_models in new_models.items():
