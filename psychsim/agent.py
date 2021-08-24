@@ -204,16 +204,19 @@ class Agent(object):
             for submodel in model.domain():
                 result[submodel] = self.decide(state,horizon,others,submodel,
                                                selection,actions,keySet, debug, context)
-                if isinstance(result[submodel]['action'],Distribution):
-                    if len(result[submodel]['action']) > 1:
-                        matrix = {'distribution': [(setToConstantMatrix(myAction,el),
-                                                    result[submodel]['action'][el]) \
-                                                   for el in result[submodel]['action'].domain()]}
+                try:
+                    matrix = result[submodel]['policy']
+                except KeyError:
+                    if isinstance(result[submodel]['action'],Distribution):
+                        if len(result[submodel]['action']) > 1:
+                            matrix = {'distribution': [(setToConstantMatrix(myAction,el),
+                                                        result[submodel]['action'][el]) \
+                                                       for el in result[submodel]['action'].domain()]}
+                        else:
+                            # Distribution with 100% certainty
+                            matrix = setToConstantMatrix(myAction,result[submodel]['action'].first())
                     else:
-                        # Distribution with 100% certainty
-                        matrix = setToConstantMatrix(myAction,result[submodel]['action'].first())
-                else:
-                    matrix = setToConstantMatrix(myAction,result[submodel]['action'])
+                        matrix = setToConstantMatrix(myAction,result[submodel]['action'])
                 if tree is None:
                     # Assume it's this model (?)
                     tree = matrix
@@ -226,22 +229,27 @@ class Agent(object):
             selection = self.getAttribute('selection',model)
         # What are my subjective beliefs for this decision?
         belief = self.getBelief(state,model)
+        # Identify candidate actions
+        if actions is None:
+            # Consider all legal actions (legality determined by my belief, circumscribed by real world)
+            actions = self.getLegalActions(belief)
         # Do I have a policy telling me what to do?
         policy = self.getAttribute('policy',model)
         if policy:
-            assert len(belief) == 1,'Unable to apply PWL policies to uncertain beliefs'
-            action = policy[iter(belief.domain()).next()]
-            if action:
-                if isinstance(action,Action):
-                    action = ActionSet([action])
-                return {'action': action}
+            action = policy[belief]
+            if isinstance(action, Distribution):
+                valid_prob = sum([action[a] for a in action.domain() if a in actions])
+                elements = [(a, action[a]/valid_prob) for a in action.domain() if a in actions]
+                result = {'policy': makeTree({'distribution': [(setToConstantMatrix(actionKey(self.name), a), prob) for a, prob in elements]}),
+                    'action': Distribution({a:prob for a, prob in elements})}
+            else:
+                result = {'policy': makeTree(setToConstantMatrix(actionKey(self.name), action)),
+                    'action': Distribution({action: 1})}
+            return result
         if horizon is None:
             horizon = self.getAttribute('horizon',model)
         else:
             horizon = min(horizon,self.getAttribute('horizon',model))
-        if actions is None:
-            # Consider all legal actions (legality determined by my belief, circumscribed by real world)
-            actions = self.getLegalActions(belief)
         if len(actions) == 0:
             # Someone made a boo-boo because there is no legal action for this agent right now
             buf = StringIO()
@@ -921,9 +929,7 @@ class Agent(object):
             return self.models[name]
 #        if name in self.world.symbols:
 #            raise NameError('Model %s conflicts with existing symbol' % (name))
-        model = {'name': name,'index': 0,'parent': None,'SE': {}, 'transition': {},
-#                 'V': ValueFunction(),
-                 'policy': {},'ignore': []}
+        model = {'name': name,'index': 0,'parent': None,'SE': {}, 'transition': {}, 'ignore': []}
         model.update(kwargs)
         model['index'] = len(self.world.symbolList)
         self.models[name] = model
@@ -943,13 +949,22 @@ class Agent(object):
         """
         return self.world.getModel(self.name, unique=unique)
 
-    def zero_level(self, parent_model=None):
+    def zero_level(self, parent_model=None, null=None):
         """
         :rtype: str
         """
         if parent_model is None:
             parent_model = self.get_true_model()
-        model = self.addModel(f'{parent_model}_zero', parent=parent_model, horizon=0, beliefs=True, static=True)
+        if null:
+            # A null policy is desired
+            model = self.addModel(f'{parent_model}_null', parent=parent_model, horizon=0, beliefs=True, static=True,
+                policy=makeTree(null))
+        elif self.actions:
+            prob = 1/len(self.actions)
+            model = self.addModel(f'{parent_model}_zero', parent=parent_model, horizon=0, beliefs=True, static=True,
+                policy=makeTree({'distribution': [(action, prob) for action in self.actions]}))
+        else:
+            model = self.addModel(f'{parent_model}_zero', parent=parent_model, horizon=0, beliefs=True, static=True)
         return model['name']
 
     def deleteModel(self,name):
@@ -1189,6 +1204,11 @@ class Agent(object):
                 world = copy.deepcopy(vector)
             else:
                 world = beliefs # copy.deepcopy(beliefs)
+            others = self.getAttribute('models', model)
+            if others:
+                self.world.setFeature(modelKey(self.name), model, world)
+                for other_name, other_model in others.items():
+                    self.world.setFeature(modelKey(other_name), other_model, world)
             return world
 
     def updateBeliefs(self,state=None,actions=set(),horizon=None, context=''):
@@ -1198,7 +1218,17 @@ class Agent(object):
             model = self.stateEstimator(state,actions,horizon)
             vector[modelKey(self.name,True)] = self.world.value2float(modelKey(self.name),model)
         else:
-            self.updateBeliefsOLD(state,actions,horizon, context=context)
+            my_key = modelKey(self.name)
+            models = self.getState(MODEL, state)
+            for model in models.domain():
+                if self.getAttribute('beliefs', model) is not True and self.getAttribute('static', model) is not True:
+                    # At least one case where I have my own belief state and it is not static
+                    self.updateBeliefsOLD(state,actions,horizon, context=context)
+                    break
+            else:
+                # No belief change for this agent under any active models
+                tree = makeTree(noChangeMatrix(my_key))
+                state *= tree
 
     def stateEstimator(self,state,actions,horizon=None):
         if not isinstance(state,KeyedVector):
@@ -1225,7 +1255,11 @@ class Agent(object):
                     newModel = self.models[newModel]['index']
             except KeyError:
                 pass
-            if myAction in self.models[oldModel]['SE'] and label in self.models[oldModel]['SE'][myAction]:
+            if self.getAttribute('static',oldModel) is True or 'beliefs' not in self.models[oldModel] or \
+                self.models[oldModel]['beliefs'] is True:
+                # My beliefs (and my current mental model) never change
+                newModel = oldModel
+            elif myAction in self.models[oldModel]['SE'] and label in self.models[oldModel]['SE'][myAction]:
                 newModel = self.models[oldModel]['SE'][myAction][label]
                 if newModel is None:
                     pass
@@ -1237,6 +1271,7 @@ class Agent(object):
                 # Get old belief state.
                 beliefs = copy.deepcopy(original)
                 # Project direct effect of the actions, including possible observations
+                assert oldModel[-4:] != 'zero'
                 outcome = self.world.step({self.name: myAction} if myAction else None,beliefs,
                     keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=False)
                 # Condition on actual observations
@@ -1305,7 +1340,8 @@ class Agent(object):
         oldDist = trueState.distributions[substate]
         newDist = oldDist.__class__()
         trueState.distributions[substate] = newDist
-        for vector,prob in [(vector,oldDist[vector]) for vector in oldDist.domain()]:
+        domain = [(vector,oldDist[vector]) for vector in oldDist.domain()]
+        for index, (vector,prob) in enumerate(domain):
             oldModel = self.world.float2value(oldModelKey,vector[oldModelKey])
             if max_horizon is None:
                 horizon = self.getAttribute('horizon', oldModel)
@@ -1313,11 +1349,7 @@ class Agent(object):
                 horizon = max_horizon
             logging.debug('{} {} updating |beliefs|={} under model {} (horizon={})'.format(context, self.name, 
                 len(vector), oldModel, horizon))
-            if self.getAttribute('static',oldModel) is True or 'beliefs' not in self.models[oldModel] or \
-                self.models[oldModel]['beliefs'] is True:
-                # My beliefs (and my current mental model) never change
-                newModel = oldModel
-            elif self.omega is True:
+            if self.omega is True:
                 # My beliefs change, but they are accurate
                 old_beliefs = self.models[oldModel]['beliefs']
                 new_beliefs = trueState.copySubset(include=old_beliefs.keys()-vector.keys())
@@ -1350,7 +1382,7 @@ class Agent(object):
                     newModel = SE[omega][myAction][horizon]
                     if newModel is None:
                         # Processing this somewhere above me in the recursion
-                        logging.warning('Recursive call... do nothing for now.')
+                        logging.warning(f'Recursive call... do nothing for {oldModel} now.')
                         newModel = oldModel
                 else:
                     # Work to be done. First, mark that we've started processing this transition
@@ -1377,7 +1409,7 @@ class Agent(object):
                             else:
                                 newModel = None
                                 logging.warning(f'{context} {self.name} (model {oldModel}) has impossible observation {o}={self.world.float2value(o,vector[o])} when doing {myAction}')
-                                logging.warning(f'Possible observations are {self.world.getFeature(o, beliefs)}')
+                                logging.warning(f'Possible observations are:\n{self.world.getFeature(o, beliefs)}')
                                 if o in self.world.dynamics and myAction in self.world.dynamics[o]:
                                     logging.warning('Action effect is:\n%s' % (self.world.dynamics[o][myAction]))
                                     logging.warning('Believed values are:\n%s' % ('\n'.join(['\t%s: %s' % (k,self.world.getFeature(k,original))
