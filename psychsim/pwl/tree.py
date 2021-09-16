@@ -394,6 +394,7 @@ class KeyedTree:
                             plane = KeyedPlane([(planeOp(p,other.children[None]),t,c)
                                                 for p,t,c in self.branch.planes])
                             plane.minimize()
+                            plane.isConjunction = self.branch.isConjunction
                         result.makeBranch(plane,trees)
                         break
                 else:
