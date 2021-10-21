@@ -996,14 +996,12 @@ class Agent(object):
                     name = state2agent(key)
                     if name != self.name:
                         if n == 1:
-                            new_models = {model: self.zero_level(parent_model=model, null=null) for model in parent_models[name]}
+                            new_models = {model: self.world.agents[name].zero_level(parent_model=model, null=null) for model in parent_models[name]}
                         else:
                             new_models = self.world.agents[name].n_level(n-1, parent_models={name: parent_models[name]}, null=null, 
                                 prefix=f'{prefix}{model["name"]}_', **kwargs)
                         beliefs.replace({self.world.value2float(key, old_model): self.world.value2float(key, new_model) for old_model, new_model in new_models.items()}, key)
-            print(model['name'], len(beliefs))
             result[parent] = model
-        exit()
         return result
 
     def get_nth_level(self, n, state=None, **kwargs):
