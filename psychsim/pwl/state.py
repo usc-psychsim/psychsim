@@ -615,8 +615,8 @@ class VectorDistributionSet:
                             s *= other.children[test]
                             substates = s.substate(other.children[test].keys(), True)
                             if substates:
-                                newSub = s.collapse(substates, False)
-                            newSub = self.update(s, new_keys|branchKeys)
+                                s.collapse(substates, False)
+                            self.update(s, new_keys|branchKeys)
         elif isinstance(other,KeyedVector):
             substates = self.substate(other)
             self.collapse(substates)
