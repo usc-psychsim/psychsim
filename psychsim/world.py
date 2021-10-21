@@ -1220,7 +1220,7 @@ class World(object):
             state = self.state
         return self.getFeature(modelKey(modelee),state,unique)
 
-    def get_current_models(self, state=None, cycle_check=False, all_models=None):
+    def get_current_models(self, state=None, cycle_check=False, all_models=None, tree=None, recurse=True):
         if state is None:
             state = self.state
         if all_models is None:
@@ -1230,22 +1230,25 @@ class World(object):
             if isModelKey(key):
                 name = state2agent(key)
                 models = set(self.getFeature(key, state).domain())
+                if tree is not None:
+                    tree[name] = {model: {} for model in models}
                 cycles = models & all_models
                 if cycle_check and cycles:
                     raise ValueError('Cycle in beliefs for models: {}'.format(', '.join(sorted(cycles))))
                 all_models |= models
                 result[name] = result.get(name, set()) | models
-                for model in models - cycles:
-                    if self.agents[name].models[model].get('beliefs', True) is not True:
-                        beliefs = self.agents[name].getBelief(model=model)
-                        new_models = self.get_current_models(beliefs, cycle_check, all_models)
-                        for sub_name, sub_models in new_models.items():
-                            if cycle_check:
-                                cycles = sub_models & all_models
-                                if cycles:
-                                    raise ValueError('Cycle in beliefs for models: {}'.format(', '.join(sorted(cycles))))
-                            all_models |= sub_models
-                            result[sub_name] = result.get(sub_name, set()) | sub_models
+                if recurse:
+                    for model in models - cycles:
+                        if self.agents[name].models[model].get('beliefs', True) is not True:
+                            beliefs = self.agents[name].getBelief(model=model)
+                            new_models = self.get_current_models(beliefs, cycle_check, all_models, tree if tree is None else tree[name][model])
+                            for sub_name, sub_models in new_models.items():
+                                if cycle_check:
+                                    cycles = sub_models & all_models
+                                    if cycles:
+                                        raise ValueError('Cycle in beliefs for models: {}'.format(', '.join(sorted(cycles))))
+                                all_models |= sub_models
+                                result[sub_name] = result.get(sub_name, set()) | sub_models
         return result
 
 
