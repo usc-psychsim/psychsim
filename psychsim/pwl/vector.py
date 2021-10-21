@@ -352,7 +352,7 @@ class VectorDistribution(Distribution):
             for diff in other.domain():
                 new = old.__class__(old)
                 new.update(diff)
-                result[new] = prob*other[diff]
+                result.addProb(new, prob*other[diff])
         if inPlace:
             return self
         else:
