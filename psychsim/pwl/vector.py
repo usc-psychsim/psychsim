@@ -507,7 +507,7 @@ class VectorDistribution(Distribution):
                 key_list = key
             for key in key_list:
                 if vector[key] in substitution:
-                    prob = vector[key]
+                    prob = self[vector]
                     del self[vector]
                     vector[key] = substitution[vector[key]]
                     self[vector] = prob
