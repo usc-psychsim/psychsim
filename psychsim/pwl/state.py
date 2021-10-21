@@ -362,6 +362,16 @@ class VectorDistributionSet:
         else:
             raise NotImplementedError
     
+    def replace(self, substitution, key=None):
+        """
+        Replaces column values, either across all columns, or only for the specified column
+        """
+        if key is None:
+            for dist in self.distributions.values():
+                dist.replace(substitution)
+        else:
+            self.distributions[self.keyMap[key]].replace(substitution, key)
+
     def items(self):
         return self.distributions.items()
 

@@ -494,6 +494,24 @@ class VectorDistribution(Distribution):
             self.addProb(vector,prob)
         return self
 
+    def replace(self, substitution, key=None):
+        """
+        Replaces column values, either across all columns, or only for the specified column
+        """
+        for vector in self.domain():
+            if key is None:
+                key_list = vector.keys()
+            elif not isinstance(key, list):
+                key_list = [key]
+            else:
+                key_list = key
+            for key in key_list:
+                if vector[key] in substitution:
+                    prob = vector[key]
+                    del self[vector]
+                    vector[key] = substitution[vector[key]]
+                    self[vector] = prob
+
     def domain(self,key=None):
         if isinstance(key,str):
             return {v[key] for v in self.domain()}
