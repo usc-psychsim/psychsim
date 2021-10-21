@@ -969,7 +969,7 @@ class Agent(object):
             model = self.addModel(f'{parent_model}{NUM_TO_WORD[0]}', parent=parent_model, horizon=0, beliefs=True, static=True, level=0)
         return model['name']
 
-    def n_level(self, n, parent_models=None, null=None, prefix='', **kwargs):
+    def n_level(self, n, parent_models=None, null={}, prefix='', **kwargs):
         """
         :warning: Does not check whether there are existing models
         """
@@ -996,7 +996,7 @@ class Agent(object):
                     name = state2agent(key)
                     if name != self.name:
                         if n == 1:
-                            new_models = {model: self.world.agents[name].zero_level(parent_model=model, null=null) for model in parent_models[name]}
+                            new_models = {model: self.world.agents[name].zero_level(parent_model=model, null=null.get(name, None)) for model in parent_models[name]}
                         else:
                             new_models = self.world.agents[name].n_level(n-1, parent_models={name: parent_models[name]}, null=null, 
                                 prefix=f'{prefix}{model["name"]}_', **kwargs)
