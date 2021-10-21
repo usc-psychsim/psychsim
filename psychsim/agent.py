@@ -16,6 +16,8 @@ from psychsim.action import Action,ActionSet
 from psychsim.pwl import *
 from psychsim.probability import Distribution
 
+NUM_TO_WORD = ['zero', 'one', 'two', 'three', 'four', 'five']
+
 class Agent(object):
     """
     :ivar name: agent name
@@ -961,11 +963,64 @@ class Agent(object):
                 policy=makeTree(null))
         elif self.actions:
             prob = 1/len(self.actions)
-            model = self.addModel(f'{parent_model}_zero', parent=parent_model, horizon=0, beliefs=True, static=True,
+            model = self.addModel(f'{parent_model}_{NUM_TO_WORD[0]}', parent=parent_model, horizon=0, beliefs=True, static=True, level=0,
                 policy=makeTree({'distribution': [(action, prob) for action in self.actions]}))
         else:
-            model = self.addModel(f'{parent_model}_zero', parent=parent_model, horizon=0, beliefs=True, static=True)
+            model = self.addModel(f'{parent_model}{NUM_TO_WORD[0]}', parent=parent_model, horizon=0, beliefs=True, static=True, level=0)
         return model['name']
+
+    def n_level(self, n, parent_models=None, null=None, prefix='', **kwargs):
+        """
+        :warning: Does not check whether there are existing models
+        """
+        if parent_models is None:
+            parent_models = {self.name: {self.get_true_model()}}
+        if n == 0:
+            raise ValueError('For n=0, use zero_level method instead')
+        try:
+            suffix = NUM_TO_WORD[n]
+        except IndexError:
+            suffix = f'level{n}'
+        beliefs = {model: self.getBelief(model=model) for model in parent_models[self.name]}
+        for belief in beliefs.values():
+            for name, models in self.world.get_current_models(belief, recurse=False).items():
+                if name != self.name:
+                    parent_models[name] = parent_models.get(name, set()) | models
+        result = {}
+        for parent in parent_models[self.name]:
+            model = self.addModel(f'{prefix}{parent}_{suffix}', parent=parent, level=n, **kwargs)
+            result[parent] = model['name']
+            beliefs = self.create_belief_state(model=model['name'])
+            for key in beliefs.keys():
+                if isModelKey(key):
+                    name = state2agent(key)
+                    if name != self.name:
+                        if n == 1:
+                            new_models = {model: self.zero_level(parent_model=model, null=null) for model in parent_models[name]}
+                        else:
+                            new_models = self.world.agents[name].n_level(n-1, parent_models={name: parent_models[name]}, null=null, 
+                                prefix=f'{prefix}{model["name"]}_', **kwargs)
+                        beliefs.replace({self.world.value2float(key, old_model): self.world.value2float(key, new_model) for old_model, new_model in new_models.items()}, key)
+            print(model['name'], len(beliefs))
+            result[parent] = model
+        exit()
+        return result
+
+    def get_nth_level(self, n, state=None, **kwargs):
+        """
+        :return: a list of the names of all nth-level models for this agent
+        """
+        kwargs['level'] = n
+        return self.filter_models(state, **kwargs)
+
+    def filter_models(self, state=None, **kwargs):
+        if state is None:
+            models = self.models
+        else:
+            models = {name for name in self.world.get_current_models(state) if name in self.models}
+        for field, value in kwargs.items():
+            models = {name for name in models if self.getAttribute(field, name) == value}
+        return models
 
     def deleteModel(self,name):
         """
