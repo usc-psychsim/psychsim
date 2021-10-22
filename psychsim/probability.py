@@ -57,7 +57,10 @@ class Distribution(dict):
 
     def __getitem__(self,element):
         key = hash(element)
-        return dict.__getitem__(self,key)
+        try:
+            return dict.__getitem__(self, key)
+        except KeyError:
+            raise KeyError(f'Element {element} not in domain')
 
     def __setitem__(self,element,value):
         """
