@@ -1101,7 +1101,11 @@ class Agent(object):
             else:
                 return None
 
-    def belief2model(self,parent,belief):
+    def belief2model(self,parent,belief, find_match=True):
+        """
+        :param find_match: if True, then try to find an existing model that matches the beliefs (takes time, but reduces model proliferation)
+        :type find_match: bool
+        """
         # Find "root" model (i.e., one that has more than just beliefs)
         if not isinstance(parent,dict):
             parent = self.models[parent]
@@ -1109,19 +1113,19 @@ class Agent(object):
             # Find the model from which we inherit reward
             parent = self.models[parent['parent']]
         # Check whether this is even a new belief (the following loop does badly otherwise)
-        if 'beliefs' in parent and parent['beliefs'] == belief:
+        if find_match and 'beliefs' in parent and parent['beliefs'] == belief:
             return parent
         # Find model sharing same parent that has same beliefs
-        for model in filter(lambda m: m['parent'] == parent['name'],self.models.values()):
-            if 'beliefs' in model and not model['beliefs'] is True:
-                if model['beliefs'] == belief:
-                    return model
-        else:
-            # Create a new model
-            index = 1
-            while '%s%d' % (parent['name'],index) in self.models:
-                index += 1
-            return self.addModel('%s%d' % (parent['name'],index),beliefs=belief,parent=parent['name'])
+        if find_match:
+            for model in filter(lambda m: m['parent'] == parent['name'],self.models.values()):
+                if 'beliefs' in model and not model['beliefs'] is True:
+                    if model['beliefs'] == belief:
+                        return model
+        # Create a new model
+        index = 1
+        while '%s%d' % (parent['name'],index) in self.models:
+            index += 1
+        return self.addModel('%s%d' % (parent['name'],index),beliefs=belief,parent=parent['name'])
 
     def printModel(self,model=None,buf=None,index=None,prefix='',reward=False,previous=None):
         if isinstance(index,int) or isinstance(index,float):
@@ -1408,7 +1412,7 @@ class Agent(object):
                 new_beliefs = trueState.copySubset(include=old_beliefs.keys()-vector.keys())
                 for key in vector.keys():
                     if key == oldModelKey:
-                        newModel = self.belief2model(oldModel, new_beliefs)['name']
+                        newModel = self.belief2model(oldModel, new_beliefs, find_match=False)['name']
                         self.world.setFeature(oldModelKey, newModel, new_beliefs)
                     elif key != CONSTANT:
                         assert key not in new_beliefs
@@ -1447,7 +1451,7 @@ class Agent(object):
                     others = [name for name in self.world.agents if modelKey(name) in beliefs and name != self.name]
                     outcome = self.world.step({self.name: myAction} if myAction else None, beliefs,
                         keySubset=beliefs.keys(), horizon=horizon, updateBeliefs=others, 
-                        context=context+'updating {}\'s beliefs'.format(self.name))
+                        context=f'{context}updating {self.name}\'s beliefs')
                     # Condition on actual observations
                     for o in self.omega:
                         if o not in beliefs:
