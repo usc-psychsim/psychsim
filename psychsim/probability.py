@@ -151,6 +151,12 @@ class Distribution(dict):
                     total += element*self[element]
             return total
 
+    def probability(self):
+        """
+        :return: the total probability mass in this distribution
+        """
+        return sum(self.values())
+        
     def __float__(self):
         return self.expectation()
 
