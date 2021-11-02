@@ -557,10 +557,7 @@ class VectorDistributionSet:
                 sufficient = not other.branch.isConjunction # If any plane test gets this value, no need to test further (e.g., False for conjunctions)
                 first = '__null__'
                 states = {first: (self, self.probability(), None)} # (state, probability, substate)
-                original_prob = states[first][1]
-                print(f'\nOriginal: {states[first][1]} * {other.__class__}')
                 for p_index, plane in enumerate(other.branch.planes):
-                    print(f'Testing: {KeyedPlane([plane])}')
                     current_states = [(old_value, s_tuple) for old_value, s_tuple in list(states.items()) if old_value != sufficient]
                     if len(current_states) == 0:
                         # No more possibility of a different result
@@ -577,10 +574,7 @@ class VectorDistributionSet:
                             assert len(partials) == 1, 'Miraculous but incorrect appearance of multiple subdistributions with probability mass < 1'
                             if partials[0] != valSub:
                                 # The test result covers a different set of variables than was tested upstream
-                                assert s.distributions[valSub].probability() == 1
                                 valSub = s.merge([partials[0], valSub])
-#                            else:
-#                                assert self.distributions[valSub].probability() == s_tuple[1]
                         del s.keyMap[keys.VALUE]
                         # Iterate through possible test results
                         vector_list = list(s.distributions[valSub].items())
@@ -589,10 +583,6 @@ class VectorDistributionSet:
                             # Test this vector against the hyperplane
                             test = other.branch.evaluate(vector[keys.VALUE], p_index)
                             del vector[keys.VALUE]
-                            print('World:')
-                            print(vector)
-                            print(prob)
-                            print(test, test in states, should_copy)
                             if test in states:
                                 if len(vector) > 1:
                                     # Merge in this vector's keys with an existing matching test result
@@ -615,11 +605,7 @@ class VectorDistributionSet:
                                 else:
                                     states[test] = (states[test][0], states[test][1]+prob, states[test][2])
                                 if len(vector) > 1:
-                                    print('Adding:', vector)
                                     states[test][0].distributions[states[test][2]].addProb(vector, prob)
-                                    print('Verifying:', states[test][0].distributions[states[test][2]])
-                                else:
-                                    print(f'Empty vector for {test} with probability {prob}')
                             elif should_copy:
                                 states[test] = (copy.deepcopy(s), prob, valSub)
                                 states[test][0].distributions[valSub].clear()
@@ -630,10 +616,6 @@ class VectorDistributionSet:
                                 states[test][0].distributions[valSub].addProb(vector, prob)
                             if states[test][0] is self:
                                 first = test
-                            for old_value, s_tuple in states.items():
-                                print(f'\nResult: {old_value} {s_tuple[0] is self}')
-                                print(s_tuple[0].distributions[s_tuple[2]])
-                                print(f'Probability {int(100*s_tuple[1])}%')
                         if len(s.distributions[valSub]) == 0:
                             del s.distributions[valSub]
                 assert states, 'Empty result of multiplication'
@@ -644,20 +626,14 @@ class VectorDistributionSet:
                             logging.error('Missing fallback branch in tree:\n%s' % (str(other)))
                         else:
                             logging.error('Missing branch for value %s in tree:\n%s' % (test, str(other)))
-                old_prob = self.probability()
-                if other.children[first].isLeaf():
-                    print(other.children[first])
                 self *= other.children[first]
                 del states[first]
                 new_keys = set(other.getKeysOut())
                 for test, s_plus in states.items():
                     s = s_plus[0]
-                    print(f'Descending {s_plus[1]} vs. {s.probability()}')
                     branch_keys = set(s.distributions[s_plus[2]].keys()) - {keys.CONSTANT}
-                    old_prob = s.probability()
                     s *= other.children[test]
                     self.update(s, new_keys|branch_keys)
-                assert self.probability() == original_prob, other
         elif isinstance(other,KeyedVector):
             substates = self.substate(other)
             self.collapse(substates)
