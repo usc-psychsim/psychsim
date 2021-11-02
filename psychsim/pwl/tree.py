@@ -771,6 +771,14 @@ def makeTree(table):
         # Binary deterministic branch
         tree = KeyedTree()
         children = {key: makeTree(table[key]) for key in table if key != 'if'}
+        if not table['if'].isConjunction and len(table['if'].planes) == 2:
+            if table['if'].planes[0][0] == table['if'].planes[1][0] and table['if'].planes[0][1] == table['if'].planes[1][1] and table['if'].planes[0][2] == -table['if'].planes[1][2]:
+                # Not equal branch, let's just compact it into a single equal branch
+                children = {True: children[False], False: children[True]}
+                table['if'].planes[0] = (table['if'].planes[0][0], table['if'].planes[0][1], 0)
+                del table['if'].planes[1]
+                table['if'].isConjunction = True
+                table['if']._string = None
         tree.makeBranch(table['if'],children)
         return tree
     elif 'case' in table:
