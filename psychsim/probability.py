@@ -160,26 +160,33 @@ class Distribution(dict):
     def __float__(self):
         return self.expectation()
 
-    def sample(self,quantify=False):
+    def sample(self, quantify=False, most_likely=False):
         """
         :param quantify: if ``True``, also returns the amount of mass by which the sampling crosssed the threshold of the generated sample's range
         :returns: an element from this domain, with a sample probability given by this distribution
         """
         if len(self) == 0:
             raise ValueError('Cannot sample from empty distribution')
-        import random
-        selection = random.uniform(0.,sum(self.values()))
-        original = selection
-        for element in self.domain():
-            if selection > self[element]:
-                selection -= self[element]
-            else:
-                if quantify:
-                    return element,selection
+        if most_likely:
+            return self.max(quantify)
+        else:
+            import random
+            selection = random.uniform(0, sum(self.values()))
+            original = selection
+            for element in self.domain():
+                prob = self[element]
+                if selection > prob:
+                    selection -= prob
                 else:
-                    return element
-        # We shouldn't get here. But in case of some floating-point weirdness?
-        return element
+                    if quantify:
+                        return element, prob
+                    else:
+                        return element
+            # We shouldn't get here. But in case of some floating-point weirdness?
+            if quantify:
+                return element, 0
+            else:
+                return element
 
     def set(self,element):
         """
@@ -202,11 +209,15 @@ class Distribution(dict):
         self.set(element)
         return prob
 
-    def max(self):
+    def max(self, quantify=False):
         """
         :returns: the most probable element in this distribution (breaking ties by returning the highest-valued element)
         """
-        return self._domain[max([(dict.__getitem__(self,element),element) for element in self._domain])[1]]
+        prob, element = max([(dict.__getitem__(self, element), element) for element in self._domain])
+        if quantify:
+            return self._domain[element], prob
+        else:
+            return self._domain[element]
 
     def entropy(self):
         """
