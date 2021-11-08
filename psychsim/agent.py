@@ -317,7 +317,7 @@ class Agent(object):
             values = {}
             for key,entry in V.items():
                 values[key] = entry['__EV__']
-            result['action'] = Distribution(values,self.getAttribute('rationality',model))
+            result['action'] = Distribution(values, self.getAttribute('rationality', model))
         elif len(best) == 1:
             # If there is only one best action, all of the selection mechanisms devolve 
             # to the same unique choice
@@ -337,8 +337,7 @@ class Agent(object):
         logging.debug('{} Choosing {}'.format(context, result['action']))
         return result
 
-    def value(self,belief,action,model,horizon=None,others=None,keySet=None,updateBeliefs=True,
-              debug={}, context=''):
+    def value(self, belief, action, model, horizon=None, others=None, keySet=None, updateBeliefs=True, debug={}, context=''):
         if horizon is None:
             horizon = self.getAttribute('horizon',model)
         if keySet is None:
