@@ -50,14 +50,20 @@ def add_reward(world):
     world.agents['Jerry'].setReward(maximizeFeature(stateKey('Jerry','health'),'Jerry'),1)
 
 def add_models(world,rationality=1.):
-    model = next(iter(world.agents['Tom'].models.keys()))
-    world.agents['Tom'].addModel('friend',rationality=rationality,parent=model)
-    world.agents['Tom'].setReward(maximizeFeature(stateKey('Jerry','health'),'Jerry'),1,'friend')
-    world.agents['Tom'].addModel('foe',rationality=rationality,parent=model)
-    world.agents['Tom'].setReward(minimizeFeature(stateKey('Jerry','health'),'Jerry'),1,'foe')
+    model = world.agents['Tom'].get_true_model()
+    world.agents['Tom'].addModel('friend', rationality=rationality, selection='distribution', horizon=1, parent=model)
+    world.agents['Tom'].setReward(maximizeFeature(stateKey('Jerry','health'),'Tom'),1,'friend')
+    world.agents['Tom'].create_belief_state(model='friend')
+    world.agents['Tom'].addModel('foe', rationality=rationality, selection='distribution', horizon=1, parent=model)
+    world.agents['Tom'].setReward(minimizeFeature(stateKey('Jerry','health'),'Tom'),1,'foe')
+    world.agents['Tom'].create_belief_state(model='foe')
+    zero = world.agents['Jerry'].zero_level()
+    world.setModel('Jerry', zero, 'Tom', 'friend')
+    world.setModel('Jerry', zero, 'Tom', 'foe')
 
 def add_beliefs(world):
-    for agent in world.agents.values():
+    agents = list(world.agents.values())
+    for index, agent in enumerate(agents):
         agent.create_belief_state()
         agent.set_observations()
 
@@ -174,7 +180,16 @@ def test_greater_than():
     health.append(world.getState('Jerry','health',unique=True))
     assert health[-1] < health[-2]
 
-def dont_test_belief_update():
+def test_reward():
+    world = setup_world()
+    add_state(world)
+    add_reward(world)
+    add_models(world)
+    assert world.agents['Tom'].reward() == -world.getState('Jerry', 'health', unique=True)
+    assert world.agents['Tom'].reward(model='foe') == -world.getState('Jerry', 'health', unique=True)
+    assert world.agents['Tom'].reward(model='friend') == world.getState('Jerry', 'health', unique=True)
+
+def test_belief_update():
     world = setup_world()
     add_state(world)
     actions = add_actions(world)
@@ -182,9 +197,12 @@ def dont_test_belief_update():
     add_reward(world)
     add_beliefs(world)
     add_models(world)
-    world.setMentalModel('Jerry','Tom',Distribution({'friend': 0.5,'foe': 0.5}))
-
-    world.step()
+    jerry = world.agents['Jerry']
+    world.setModel('Tom', Distribution({'friend': 0.5, 'foe': 0.5}), 'Jerry', jerry.get_true_model())
+    world.step({'Tom': actions['hit']})
+    for model, belief in jerry.getBelief().items():
+        print(model)
+        print(world.getModel('Tom', belief))
 
 def test_zero_level():
     world = setup_world()
