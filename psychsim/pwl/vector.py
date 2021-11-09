@@ -20,7 +20,7 @@ class KeyedVector(collections.abc.MutableMapping):
         self._string = None
         if isinstance(arg,Node):
             self.parse(arg)
-        else:
+        elif arg:
             self._data.update(arg)
 
     def prune(self):
