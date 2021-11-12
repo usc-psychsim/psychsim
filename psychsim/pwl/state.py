@@ -471,13 +471,10 @@ class VectorDistributionSet:
                 marginal = self.marginal(key)
                 total += other[key]*next(iter(marginal.domain()))
         self.join(keys.VALUE,total,destination)
-        for vector in self.distributions[destination].domain():
-            prob = self.distributions[destination][vector]
+        dist = self.distributions[destination]
+        for vector, prob in list(dist.items()):
             del self.distributions[destination][vector]
-            for key in other:
-                if key == keys.CONSTANT or self.keyMap[key] == destination:
-                    # Uncertain value
-                    vector[keys.VALUE] += other[key]*vector[key]
+            vector[keys.VALUE] += sum([other[key]*vector.get(key, 0) for key in other])
             self.distributions[destination][vector] = prob
 
     def multiply_matrix(self, other):
