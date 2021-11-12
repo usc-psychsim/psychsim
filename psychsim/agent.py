@@ -203,7 +203,9 @@ class Agent(object):
             tree = None
             myAction = keys.stateKey(self.name,keys.ACTION)
             myModel = keys.modelKey(self.name)
-            for submodel in model.domain():
+            model_list = model.domain()
+            tree = {'if': equalRow(myModel, model_list)}
+            for index, submodel in enumerate(model_list):
                 result[submodel] = self.decide(state,horizon,others,submodel,
                                                selection,actions,keySet, debug, context)
                 try:
@@ -219,12 +221,10 @@ class Agent(object):
                             matrix = setToConstantMatrix(myAction,result[submodel]['action'].first())
                     else:
                         matrix = setToConstantMatrix(myAction,result[submodel]['action'])
-                if tree is None:
-                    # Assume it's this model (?)
-                    tree = matrix
-                else:
-                    plane = equalRow(myModel,submodel)
-                    tree = {'if': plane, True: matrix,False: tree}
+                tree[index] = matrix
+            if len(model_list) == 1:
+                # Only one possible model, let's not branch
+                tree = tree[0]
             result['policy'] = makeTree(tree)
             return result
         if selection is None:
