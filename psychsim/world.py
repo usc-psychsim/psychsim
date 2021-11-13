@@ -1044,14 +1044,7 @@ class World(object):
             key = makePresent(key)
         if isinstance(flt,psychsim.probability.Distribution):
             # Decode each element
-            value = flt.__class__()
-            for element in flt.domain():
-                newElement = self.float2value(key,element)
-                try:
-                    value[newElement] += flt[element]
-                except KeyError:
-                    value[newElement] = flt[element]
-            return value
+            return flt.__class__([(self.float2value(key, element), prob) for element, prob in flt.items()])
         elif isinstance(flt,set):
             return {self.float2value(key,element) for element in flt}
         elif self.variables[key]['domain'] is bool:
@@ -1077,14 +1070,7 @@ class World(object):
         """
         if isinstance(value,psychsim.probability.Distribution):
             # Encode each element
-            newValue = value.__class__()
-            for element in value.domain():
-                newElement = self.value2float(key,element)
-                try:
-                    newValue[newElement] += value[element]
-                except KeyError:
-                    newValue[newElement] = value[element]
-            return newValue
+            return value.__class__([(self.value2float(key, element), prob) for element, prob in value.items()])
         elif self.variables[key]['domain'] is bool:
             if value:
                 return 1.
