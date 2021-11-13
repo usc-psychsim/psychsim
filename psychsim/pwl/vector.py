@@ -311,26 +311,28 @@ class VectorDistribution(Distribution):
         else:
             return set()
     
-    def join(self,key,value):
+    def join(self, key, value):
         """
         Modifies the distribution over vectors to have the given value for the given key
         :param key: the key to the column to modify
         :type key: str
         :param value: either a single value to apply to all vectors, or else a L{Distribution} over possible values
         """
-        original = dict(self)
-        domain = self.domain()
-        self.clear()
-        for row in domain:
-            prob = original[hash(row)]
-            if isinstance(value,Distribution):
-                for element in value.domain():
-                    new = row.__class__(row)
-                    new[key] = element
-                    self.addProb(new,prob*value[element])
-            else:
-                row[key] = value
-                self.addProb(row,prob)
+        if isinstance(value, Distribution) and len(value) > 1:
+            # Uncertain values to be joined
+            new_items = []
+            for my_el, my_prob in self.items():
+                for yr_el, yr_prob in value.items():
+                    new_row = my_el.__class__(my_el)
+                    new_row[key] = yr_el
+                    new_items.append((new_row, my_prob*yr_prob))
+            self._Distribution__items = new_items
+        else:
+            if isinstance(value, Distribution):
+                value = value.first()
+            for index, item in enumerate(self._Distribution__items):
+                item[0][key] = value
+                self._Distribution__items[index] = (item[0], item[1])
 
 
     def merge(self,other,inPlace=False):
