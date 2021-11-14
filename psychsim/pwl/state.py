@@ -318,7 +318,7 @@ class VectorDistributionSet:
                         self.keyMap[key] = destination
         return destination
 
-    def join(self,key,value,substate=None):
+    def join(self, key, value, substate=None):
         """
         Modifies the distribution over vectors to have the given value for the given key
         :param key: the key to the column to modify
@@ -511,9 +511,7 @@ class VectorDistributionSet:
                 self.join(rowKey,total,destination)
             else:
                 # There is at least one uncertain multiplicand
-                for state in self.distributions[destination].domain():
-                    prob = self.distributions[destination][state]
-                    del self.distributions[destination][state]
+                for state, prob in self.distributions[destination].items():
                     total = 0
                     for colKey in vector.keys():
                         if colKey == keys.CONSTANT:
@@ -528,7 +526,7 @@ class VectorDistributionSet:
                                 value = self.distributions[substate].first()[colKey]
                             total += vector[colKey]*value
                     state[rowKey] = total
-                    self.distributions[destination][state] = prob
+                    self.keyMap[rowKey] = destination
             self.keyMap[rowKey] = destination
 
     def multiply_tree(self, other, probability=1, select=False):
@@ -700,17 +698,17 @@ class VectorDistributionSet:
         :param debug: if True, then run some checks on the values
         """
         # What keys have both current and future values?
-        pairs = {k for k in self.keyMap if k != keys.CONSTANT and
-                 not keys.isFuture(k) and keys.makeFuture(k) in self.keyMap}
+        pairs = [k for k in self.keyMap if k != keys.CONSTANT and
+                 not keys.isFuture(k) and keys.makeFuture(k) in self.keyMap]
         for now in pairs:
             nowSub = self.keyMap[now]
             future = keys.makeFuture(now)
             futureSub = self.keyMap[future]
             del self.keyMap[future]
             distribution = self.distributions[nowSub]
-            for vector in distribution.domain():
-                prob = distribution[vector]
-                del distribution[vector]
+            items = list(distribution.items())
+            distribution.clear()
+            for vector, prob in items:
                 if nowSub == futureSub:
                     # Kill two birds with one stone
                     vector[now] = vector[future]
@@ -718,7 +716,7 @@ class VectorDistributionSet:
                 else:
                     del vector[now]
                 if len(vector) > 1:
-                    distribution.addProb(vector,prob)
+                    distribution.add_prob(vector, prob)
                 elif len(vector) == 1 and debug:
                     assert next(iter(vector.keys())) == keys.CONSTANT
             if nowSub != futureSub:
@@ -727,15 +725,12 @@ class VectorDistributionSet:
                     del self.distributions[nowSub]
                 self.keyMap[now] = futureSub
                 distribution = self.distributions[futureSub]
-                for vector in distribution.domain():
-                    prob = distribution[vector]
-                    del distribution[vector]
+                items = list(distribution.items())
+                distribution.clear()
+                for vector, prob in items:
                     vector[now] = vector[future]
                     del vector[future]
-                    if len(vector) > 1:
-                        distribution.addProb(vector,prob)
-                    elif len(vector) == 1 and debug:
-                        assert next(iter(vector.keys())) == keys.CONSTANT
+                    distribution.add_prob(vector, prob)
             if debug:
                 assert now in self.keyMap
                 assert self.keyMap[now] in self.distributions,now
@@ -883,11 +878,9 @@ class VectorDistributionSet:
                     assert other == keys.CONSTANT or self.keyMap[other] == self.keyMap[key] ,\
                         f'Unmapped key {other} is in vector\n{vector}'
             if sumToOne:
-                assert (sum(distribution.values())-1)<.000001,'Distribution sums to %4.2f' % \
-                    (sum(distribution.values()))
+                assert (distribution.probability()-1)<.000001,'Distribution sums to %4.2f' % (distribution.probability())
             else:
-                assert sum(distribution.values())<1.000001,'Distribution sums to %4.2f' % \
-                    (sum(distribution.values()))
+                assert distribution.probability()<1.000001, f'Distribution sums to {distribution.probability()}'
 
     def copy_value(self, old_key, new_key):
         """
