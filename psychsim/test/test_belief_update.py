@@ -200,9 +200,9 @@ def test_belief_update():
     jerry = world.agents['Jerry']
     world.setModel('Tom', Distribution({'friend': 0.5, 'foe': 0.5}), 'Jerry', jerry.get_true_model())
     world.step({'Tom': actions['hit']})
-    for model, belief in jerry.getBelief().items():
-        print(model)
-        print(world.getModel('Tom', belief))
+#    for model, belief in jerry.getBelief().items():
+#        print(model)
+#        print(world.getModel('Tom', belief))
 
 def test_zero_level():
     world = setup_world()
