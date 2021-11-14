@@ -49,7 +49,6 @@ class Distribution:
             if other == element:
                 return prob
         else:
-            print(self.__items)
             raise ValueError(f'Element {element} not in domain')
 
     def __setitem__(self, element, probability):
