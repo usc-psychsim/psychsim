@@ -145,6 +145,22 @@ class Distribution:
         else:
             return sum([element*probability for element, probability in self.__items])
 
+    def remove_duplicates(self):
+        """
+        Makes sure all elements are unique (combines probability mass when appropriate)
+        :warning: modifies this distribution in place
+        """
+        i = 0
+        while i < len(self.__items)-1:
+            j = i+1
+            while j < len(self.__items):
+                if self.__items[i][0] == self.__items[j][0]:
+                    self.__items[i] = (self.__items[i][0], self.__items[i][1]+self.__items[j][1])
+                    del self.__items[j]
+                else:
+                    j += 1
+            i += 1
+
     def probability(self):
         """
         :return: the total probability mass in this distribution
@@ -244,11 +260,14 @@ class Distribution:
             i += 1
 
     def sorted_string(self):
-        return '\n'.join([f'{int(round(100*prob)): >3d}%: '+str(element).replace("\n", "\n\t") for element, prob in sorted(self.__items, key=lambda item: item[0])])
+        return '\n'.join([f'{int(round(100*prob)): >3d}%: '+self.element_to_str(element).replace("\n", "\n\t") for element, prob in sorted(self.__items, key=lambda item: item[0])])
 
     def __str__(self):
-        return '\n'.join([f'{int(round(100*prob)): >3d}%: '+str(element).replace("\n", "\n\t") for element, prob in self.__items])
+        return '\n'.join([f'{int(round(100*prob)): >3d}%: '+self.element_to_str(element).replace("\n", "\n\t") for element, prob in self.__items])
 
+    def element_to_str(self, element):
+        return str(element)
+        
 #    def __hash__(self):
 #        return hash(self.__items)
 
