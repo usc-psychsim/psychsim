@@ -203,7 +203,7 @@ class Agent(object):
             tree = None
             myAction = keys.stateKey(self.name,keys.ACTION)
             myModel = keys.modelKey(self.name)
-            model_list = model.domain()
+            model_list = list(model.domain())
             tree = {'if': equalRow(myModel, model_list)}
             for index, submodel in enumerate(model_list):
                 result[submodel] = self.decide(state,horizon,others,submodel,
