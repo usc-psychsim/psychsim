@@ -472,10 +472,8 @@ class VectorDistributionSet:
                 total += other[key]*next(iter(marginal.domain()))
         self.join(keys.VALUE,total,destination)
         dist = self.distributions[destination]
-        for vector, prob in list(dist.items()):
-            del self.distributions[destination][vector]
-            vector[keys.VALUE] += sum([other[key]*vector.get(key, 0) for key in other])
-            self.distributions[destination][vector] = prob
+        for index, item in enumerate(dist._Distribution__items):
+            item[0][keys.VALUE] += sum([other[key]*item[0].get(key, 0) for key in other])
 
     def multiply_matrix(self, other):
         # Focus on subset that this matrix affects
@@ -839,6 +837,9 @@ class VectorDistributionSet:
             if len(dist) > 1]))
 
     def copySubset(self, ignore=None, include=None):
+        raise DeprecationWarning('Use copy_subset instead')
+
+    def copy_subset(self, ignore=None, include=None):
         result = self.__class__()
         if ignore is None and include is None:
                 # Ignoring nothing, including everything, so this is just a copy
@@ -854,16 +855,16 @@ class VectorDistributionSet:
                 distribution = self.distributions[self.keyMap[key]]
                 substate = len(result.distributions)
                 result.distributions[substate] = distribution.__class__()
-                intersection = [k for k in distribution.keys() if k in keySubset]
+                intersection = distribution.keys() & keySubset #[k for k in distribution.keys() if k in keySubset]
                 for subkey in intersection:
                     result.keyMap[subkey] = substate
-                newDist = {}
-                for vector in distribution.domain():
-                    newValues = {subkey: vector[subkey] for subkey in intersection}
-                    newValues[keys.CONSTANT] = 1
-                    newVector = vector.__class__(newValues)
-                    newDist[newVector] = distribution[vector]+newDist.get(newVector,0.)
-                result.distributions[substate] = VectorDistribution(newDist)
+                new_dist = []
+                for vector, prob in distribution.items():
+                    new_dict = {subkey: vector[subkey] for subkey in intersection}
+                    new_dict[keys.CONSTANT] = 1
+                    new_dist.append((vector.__class__(new_dict), prob))
+                result.distributions[substate] = VectorDistribution(new_dist)
+                result.distributions[substate].remove_duplicates()
         return result
                     
     def verifyIntegrity(self,sumToOne=False):
