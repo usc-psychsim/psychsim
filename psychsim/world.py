@@ -159,6 +159,7 @@ class World(object):
         for stage in effect:
             state = self.applyEffect(state,stage,select)
         # The future becomes the present
+        state.verifyIntegrity()
         state.rollback()
         if updateBeliefs:
             # Update agent models included in the original world
@@ -392,10 +393,13 @@ class World(object):
     """-----------------"""
 
     def addAgent(self, agent, setModel=True, avoid_beliefs=True):
-        if isinstance(agent,str):
+        return self.add_agent(agent, setModel, avoid_beliefs)
+
+    def add_agent(self, agent, setModel=True, avoid_beliefs=True):
+        if isinstance(agent, str):
             agent = Agent(agent)
         if self.has_agent(agent):
-            raise NameError('Agent %s already exists in this world' % (agent.name))
+            raise NameError(f'Agent {agent.name} already exists in this world')
         else:
             self.agents[agent.name] = agent
             agent.world = self
@@ -405,18 +409,18 @@ class World(object):
             
             if len(agent.models) == 0:
                 # Default model settings
-                agent.addModel('%s0' % (agent.name),R=None,horizon=2,level=2,rationality=1.,
-                              discount=1.,selection='consistent',
-                              beliefs=True,parent=None,projector=Distribution.expectation)
+                agent.addModel('%s0' % (agent.name), R=None, horizon=2, level=2, rationality=1.,
+                              discount=1., selection='consistent',
+                              beliefs=True, parent=None, projector=Distribution.expectation)
             if setModel:
-                if isinstance(self.state,VectorDistributionSet):
+                if isinstance(self.state, VectorDistributionSet):
                     # Initialize model of this agent to be uniform distribution (got a better idea?)
                     prob = 1./float(len(agent.models))
                     dist = {model: prob for model in agent.models}
-                    self.setModel(agent.name,dist)
+                    self.setModel(agent.name, dist)
                 else:
                     assert len(agent.models) == 1
-                    self.setModel(agent.name,next(iter(agent.models.keys())))
+                    self.setModel(agent.name, next(iter(agent.models.keys())))
         return agent
 
     def has_agent(self,agent):
@@ -1241,23 +1245,22 @@ class World(object):
     def getMentalModel(self,modelee,vector):
         raise DeprecationWarning('Substitute getModel instead (sorry for pedanticism, but a "model" may be real, not "mental")')
 
-    def setModel(self,modelee,distribution,state=None,model=None):
+    def setModel(self, modelee, distribution, state=None, model=None):
         # Make sure distribution is probability distribution over floats
         if state is None:
             state = self.state
-        if isinstance(state,VectorDistributionSet):
-            if not isinstance(distribution,dict):
+        if isinstance(state, VectorDistributionSet):
+            if not isinstance(distribution, dict):
                 distribution = {distribution: 1.}
-            if not isinstance(distribution,psychsim.probability.Distribution):
+            if not isinstance(distribution, psychsim.probability.Distribution):
                 distribution = psychsim.probability.Distribution(distribution)
-#            distribution.normalize()
         key = modelKey(modelee)
-        if isinstance(state,str):
+        if isinstance(state, str):
             # This is the name of the modeling agent (*cough* hack *cough*)
-            self.agents[state].setBelief(key,distribution,model)
+            self.agents[state].setBelief(key, distribution, model)
         else:
             # Otherwise, assume we're changing the model in the current state
-            self.setFeature(key,distribution,state)
+            self.setFeature(key, distribution, state)
         
     def setMentalModel(self,modeler,modelee,distribution,model=None):
         """
