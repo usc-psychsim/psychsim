@@ -159,7 +159,6 @@ class World(object):
         for stage in effect:
             state = self.applyEffect(state,stage,select)
         # The future becomes the present
-        state.verifyIntegrity()
         state.rollback()
         if updateBeliefs:
             # Update agent models included in the original world
