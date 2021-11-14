@@ -335,7 +335,7 @@ class VectorDistribution(Distribution):
                 self._Distribution__items[index] = (item[0], item[1])
 
 
-    def merge(self,other,inPlace=False):
+    def merge(self, other, inPlace=False):
         """
         Merge two distributions (the passed-in distribution takes precedence over this one in case of conflict)
         :type other: VectorDistribution
@@ -346,25 +346,17 @@ class VectorDistribution(Distribution):
         """
         if inPlace:
             result = self
+            items = list(self.items())
+            result.clear()
         else:
-            result = {}
-        for old in self.domain():
-            prob = self[old]
-            del self[old]
-            for diff in other.domain():
-                new = old.__class__(old)
-                new.update(diff)
-                result.addProb(new, prob*other[diff])
-        if inPlace:
-            return self
-        else:
-            return self.__class__(result)
-        
-    def element2xml(self,value):
-        return value.__xml__().documentElement
-
-    def xml2element(self,key,node):
-        return KeyedVector(node)
+            result = self.__class__()
+            items = self.items()
+        for my_el, my_prob in items:
+            for yr_el, yr_prob in other.items():
+                new_el = my_el.__class__(my_el)
+                new_el.update(yr_el)
+                result.add_prob(new_el, my_prob*yr_prob)
+        return result
 
     def marginal(self,key):
         result = {}
