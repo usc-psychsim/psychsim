@@ -63,7 +63,6 @@ class World(object):
 
         # Turn order state info
         self.maxTurn = None
-        self.turnSubstate = None
         self.turnKeys = set()
 
         # Action effect information
@@ -697,9 +696,7 @@ class World(object):
                 key = turnKey(name)
                 self.turnKeys.add(key)
                 if not key in self.variables:
-                    if self.turnSubstate == None and isinstance(self.state,VectorDistributionSet):
-                        self.turnSubstate = max(self.state.distributions.keys())+1
-                    self.defineVariable(key,int,hi=self.maxTurn,substate=self.turnSubstate)
+                    self.defineVariable(key, int, hi=self.maxTurn)
                 self.setFeature(key,index)
                 # Insert action key
                 key = stateKey(name,keys.ACTION)
@@ -859,7 +856,7 @@ class World(object):
     """-------------"""
 
     def defineVariable(self,key,domain=float,lo=0.,hi=1.,description=None,
-                       combinator=None,substate=None,codePtr=False, avoid_beliefs=True):
+                       combinator=None,codePtr=False, avoid_beliefs=True):
         """
         Define the type and domain of a given element of the state vector
 
@@ -880,7 +877,6 @@ class World(object):
         :param description: optional text description explaining what this state feature means
         :type description: str
         :param combinator: how should multiple dynamics for this variable be combined
-        :param substate: name of independent state subvector this variable belongs to
         """
         if avoid_beliefs:
             for agent in self.agents.values():
@@ -894,9 +890,7 @@ class World(object):
             raise ValueError('Ending single-quote reserved for indicating future state')
         self.variables[key] = {'domain': domain,
                                'description': description,
-                               'substate': substate,
                                'combinator': combinator}
-#        self.state.keyMap[key] = substate
         if domain is float:
             self.variables[key].update({'lo': lo,'hi': hi})
         elif domain is int:
@@ -980,14 +974,7 @@ class World(object):
                     state[key] = self.value2float(key,value)
             else:
                 # Set new value for this feature
-                substate = self.variables[key]['substate']
-                if substate is None:
-                    try:
-                        substate = max(state.distributions.keys())+1
-                    except ValueError:
-                        substate = 0
-                    self.variables[key]['substate'] = substate
-                state.join(key,self.value2float(key,value),substate)
+                state.join(key,self.value2float(key,value))
         elif isinstance(state,VectorDistribution):
             state.join(key,self.value2float(key,value))
         else:
@@ -1128,8 +1115,7 @@ class World(object):
     def decodeVariable(self,key,distribution):
         raise DeprecationWarning('Use float2value method instead')
 
-    def defineState(self,entity,feature,domain=float,lo=0.,hi=1.,description=None,combinator=None,
-                    substate=None,codePtr=False):
+    def defineState(self,entity,feature,domain=float,lo=0.,hi=1.,description=None,combinator=None, codePtr=False):
         """
         Defines a state feature associated with a single agent, or with the global world state.
         :param entity: if C{None}, the given feature is on the global world state; otherwise, it is local to the named agent
@@ -1144,7 +1130,7 @@ class World(object):
             self.locals[entity] = {feature: key}
         if not domain is None:
             # Haven't defined this feature yet
-            self.defineVariable(key,domain,lo,hi,description,combinator,substate,codePtr)
+            self.defineVariable(key,domain,lo,hi,description,combinator, codePtr)
         return key
 
     def setState(self, entity, feature, value, state=None, noclobber=False, recurse=False):
