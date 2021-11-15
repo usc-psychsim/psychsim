@@ -767,6 +767,8 @@ def makeTree(table):
         return KeyedTree(table)
     elif isinstance(table,KeyedTree):
         return table
+    elif isinstance(table, KeyedMatrix):
+        return KeyedTree(table)
     elif 'if' in table:
         # Binary deterministic branch
         tree = KeyedTree()
