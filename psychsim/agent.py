@@ -1167,7 +1167,7 @@ class Agent(object):
             include = state.keys()
         if isinstance(state,VectorDistributionSet):
             if issubclass(stateType,VectorDistributionSet):
-                beliefs = state.copySubset(ignore,include)
+                beliefs = state.copy_subset(ignore, include)
             elif issubclass(stateType,KeyedVector):
                 vector = state.vector()
                 beliefs = stateType({key: vector[key] for key in include if key not in ignore})
@@ -1408,7 +1408,7 @@ class Agent(object):
             if self.omega is True:
                 # My beliefs change, but they are accurate
                 old_beliefs = self.models[oldModel]['beliefs']
-                new_beliefs = trueState.copySubset(include=old_beliefs.keys()-vector.keys())
+                new_beliefs = trueState.copy_subset(include=old_beliefs.keys()-vector.keys())
                 for key in vector.keys():
                     if key == oldModelKey:
                         newModel = self.belief2model(oldModel, new_beliefs, find_match=False)['name']
