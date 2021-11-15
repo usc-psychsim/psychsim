@@ -327,6 +327,7 @@ class VectorDistributionSet:
         :substate: name of substate vector distribution to join with, ignored if the key already exists in this state. By default, find a new substate
         """
         if key in self.keyMap:
+            assert substate is None, f'Cannot join {key} to distribution {substate} as it already exists in distribution {self.keyMap[key]}'
             substate = self.keyMap[key]
         else:
             if substate is None:
@@ -335,8 +336,8 @@ class VectorDistributionSet:
                     substate += 1
             self.keyMap[key] = substate
         if not substate in self.distributions:
-            self.distributions[substate] = VectorDistribution({KeyedVector({keys.CONSTANT:1}):1})
-        return self.distributions[substate].join(key,value)
+            self.distributions[substate] = VectorDistribution([(KeyedVector({keys.CONSTANT:1}), 1)])
+        return self.distributions[substate].join(key, value)
 
     def marginal(self,key):
         return self.distributions[self.keyMap[key]].marginal(key)
@@ -477,44 +478,38 @@ class VectorDistributionSet:
 
     def multiply_matrix(self, other):
         # Focus on subset that this matrix affects
-        substates = self.substate(other.getKeysIn(),True)
+        substates = self.substate(other.getKeysIn(), True)
         if substates:
             destination = self.collapse(substates)
         else:
             destination = None
-        #     if destination:
-        #         print self.distributions[destination]
-        #         print len(self.distributions[destination])
-        # destination = self.findUncertainty(substates)
         # Go through each key this matrix sets
-        for rowKey,vector in other.items():
+        for rowKey, vector in other.items():
             result = Distribution()
             if destination is None:
                 # Every value is 100%
                 total = 0
-                for colKey in vector.keys():
+                for colKey, weight in vector.items():
                     if colKey == keys.CONSTANT:
                         # Doesn't really matter
-                        total += vector[colKey]
+                        total += weight
                     else:
                         substate = self.keyMap[colKey]
                         value = self.distributions[substate].first()[colKey]
-                        total += vector[colKey]*value
-                assert not rowKey in self.keyMap,'%s already exists' % (rowKey)
+                        total += weight*value
+#                assert not rowKey in self.keyMap,'%s already exists' % (rowKey)
                 destination = len(self.distributions)
                 while destination in self.distributions:
                     destination -= 1
-#                    destination = max(self.keyMap.values())+1
-                assert not destination in self.distributions,self.distributions[destination]
-                self.join(rowKey,total,destination)
+                self.join(rowKey, total, destination)
             else:
                 # There is at least one uncertain multiplicand
                 for state, prob in self.distributions[destination].items():
                     total = 0
-                    for colKey in vector.keys():
+                    for colKey, weight in vector.items():
                         if colKey == keys.CONSTANT:
                             # Doesn't really matter
-                            total += vector[colKey]
+                            total += weight
                         else:
                             substate = self.keyMap[colKey]
                             if substate == destination:
@@ -522,10 +517,9 @@ class VectorDistributionSet:
                             else:
                                 # Certainty
                                 value = self.distributions[substate].first()[colKey]
-                            total += vector[colKey]*value
+                            total += weight*value
                     state[rowKey] = total
-                    self.keyMap[rowKey] = destination
-            self.keyMap[rowKey] = destination
+                self.keyMap[rowKey] = destination
 
     def multiply_tree(self, other, probability=1, select=False):
         if other.isLeaf():
