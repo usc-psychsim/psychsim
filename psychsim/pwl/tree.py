@@ -166,10 +166,8 @@ class KeyedTree:
                             {value: self.children[value].desymbolize(table) \
                              for value in self.children})
         else:
-            new = TreeDistribution()
-            for child in self.children.domain():
-                new.addProb(child.desymbolize(table),self.children[child])
-            tree.makeProbabilistic(new)
+            new_branch = Distribution([(child.desymbolize(table), prob) for child, prob in self.children.items()])
+            tree.makeProbabilistic(new_branch)
         return tree
 
     def floor(self,key,lo):
@@ -258,7 +256,7 @@ class KeyedTree:
             new = {}
             for child in self.children.domain():
                 new[child.scale(table)] = self.children[child]
-            tree.makeProbabilistic(TreeDistribution(new))
+            tree.makeProbabilistic(Distribution(new))
         return tree
 
     def __eq__(self,other):
@@ -304,7 +302,7 @@ class KeyedTree:
                 for child in self.children.domain():
                     prod = other*child
                     dist[prod] = dist.get(prod,0.)+self.children[child]
-                tree.makeProbabilistic(TreeDistribution(dist))
+                tree.makeProbabilistic(Distribution(dist))
             else:
                 tree.makeBranch(self.branch,
                                 {value: other*self.children[value] for value in self.children})
@@ -449,7 +447,7 @@ class KeyedTree:
         @param planeOp: functional transformation of hyperplanes
         @type planeOp: lambda XS{->}X
         @param distOp: functional transformation of probabilistic branches
-        @type distOp: lambda L{TreeDistribution}S{->}X
+        @type distOp: lambda L{Distribution}S{->}X
         @rtype: L{KeyedTree}
         """
         result = self.__class__()
@@ -499,7 +497,7 @@ class KeyedTree:
         Grafts a tree at the current node
         @warning: clobbers anything currently at (or rooted at) this node
         """
-        if isinstance(root,TreeDistribution):
+        if isinstance(root,Distribution):
             self.makeProbabilistic(root)
         elif isinstance(root,KeyedTree):
             if root.isLeaf():
@@ -718,7 +716,7 @@ class KeyedTree:
                     key = eval(node.getAttribute('key'))
                     children[key] = KeyedTree(node)
                 elif node.tagName == 'distribution':
-                    children = TreeDistribution(node)
+                    children = Distribution(node)
                 elif node.tagName == 'bool':
                     key = eval(node.getAttribute('key'))
                     children[key] = eval(node.getAttribute('value'))
@@ -741,16 +739,6 @@ class KeyedTree:
             self.makeProbabilistic(children)
         else:
             self.makeLeaf(children[None])
-
-class TreeDistribution(Distribution):
-    """
-    A class representing a L{Distribution} over L{KeyedTree} instances
-    """
-    def element2xml(self,value):
-        return value.__xml__().documentElement
-
-    def xml2element(self,key,node):
-        return KeyedTree(node)
 
 def makeTree(table):
     if isinstance(table,bool):
@@ -806,7 +794,7 @@ def makeTree(table):
         branch = {}
         for subtable,prob in table['distribution']:
             branch[makeTree(subtable)] = prob
-        tree.makeProbabilistic(TreeDistribution(branch))
+        tree.makeProbabilistic(Distribution(branch))
         return tree
     else:
         # Leaf
