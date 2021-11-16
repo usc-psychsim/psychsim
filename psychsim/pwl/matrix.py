@@ -1,78 +1,109 @@
 import copy
-from xml.dom.minidom import Document,Node
 
 from psychsim.probability import Distribution
 
 from psychsim.pwl.vector import *
-from psychsim.pwl.keys import CONSTANT,makeFuture
+from psychsim.pwl.keys import CONSTANT, makeFuture
 
-class KeyedMatrix(dict):
-    def __init__(self,arg={}):
-        self._keysIn = None
-        self._keysOut = None
-        if isinstance(arg,Node):
-            try:
-                super().__init__()
-            except TypeError:
-                super(KeyedMatrix,self).__init__()
-            self.parse(arg)
+class KeyedMatrix:
+    """
+    Keeps rows in order by key
+    """
+    def __init__(self, arg=None):
+        self.__keys_in = None
+        self.__keys_out = None
+        if isinstance(arg, dict):
+            self.__rows = sorted(arg.items())
+        elif isinstance(arg, list):
+            self.__rows = sorted(arg)
         else:
-            try:
-                super().__init__(arg)
-            except TypeError:
-                super(KeyedMatrix,self).__init__(arg)
-            self._string = None
+            self.__rows = []
+        self.__string = None
         
+    def items(self):
+        return iter(self.__rows)
+
     def __deepcopy__(self,memo):
-        result = self.__class__({key: copy.deepcopy(row) for key,row in self.items()})
-        result._keysIn = self._keysIn
-        result._keysOut = self._keysOut
-        result._string = self._string
+        result = self.__class__(copy.deepcopy(self.__rows, memo))
+        result.__keys_in = None #self.__keys_in
+        result.__keys_out = None #self.__keys_out
+        result.__string = None #self.__string
         return result
 
-    def __eq__(self,other):
-        return str(self) == str(other)
-         # for key,vector in self.items():
-         #     try:
-         #         if vector != other[key]:
-         #             return False
-         #     except KeyError:
-         #         if vector != {}:
-         #             return False
-         # else:
-         #     return True
+    def __len__(self):
+        return len(self.__rows)
 
-    def __ne__(self,other):
+    def __eq__(self, other):
+        my_index = 0
+        while my_index < len(self):
+            my_key, my_vector = self.__rows[my_index]
+            yr_index = 0
+            while yr_index < len(other):
+                yr_key, yr_vector = other.__rows[yr_index]
+                if yr_key == my_key:
+                    if my_vector != yr_vector:
+                        return False
+                    else:
+                        break
+                elif yr_key > my_key:
+                    # Already passed where this key would be
+                    return False
+                else:
+                    yr_index += 1
+            else:
+                # Did not find any vector for this key
+                return False
+            my_index += 1
+        else:
+            return True
+
+    def __ne__(self, other):
         return not self == other
 
     def __neg__(self):
-        result = KeyedMatrix()
-        for key,vector in self.items():
-            result[key] = -vector
+        result = self.__class__([(key, -vector) for key, vector in self.__rows])
+        result.__keys_in = self.__keys_in
+        result.__keys_out = self.__keys_out
         return result
 
-    def __add__(self,other):
-        result = KeyedMatrix()
-        for key,vector in self.items():
-            try:
-                result[key] = vector + other[key]
-            except KeyError:
-                result[key] = KeyedVector(vector)
-        for key,vector in other.items():
-            if not key in result:
-                result[key] = KeyedVector(vector)
-        return result
+    def __add__(self, other):
+        items = []
+        my_index = 0
+        yr_index = 0
+        while my_index < len(self):
+            my_key, my_vector = self.__rows[my_index]
+            if yr_index < len(other):
+                yr_key, yr_vector = self.__rows[yr_index]
+                if my_key == yr_key:
+                    items.append((my_key, my_vector+yr_vector))
+                    my_index += 1
+                    yr_index += 1
+                elif my_key < yr_key:
+                    items.append((my_key, my_vector))
+                    my_index += 1
+                else: # my_key > yr_key
+                    items.append((yr_key, yr_vector))
+                    yr_index += 1
+            else:
+                # No more rows in other
+                items.append((my_key, my_vector))
+                my_index += 1
+        # No more rows in me
+        while yr_index < len(other):
+            items.append(self.__rows[yr_index])
+            yr_index += 1
+        return KeyedMatrix(items)
 
     def __sub__(self,other):
         return self + (-other)
 
-    def mulByMatrix(self,other):
+    def multiply_matrix(self, other):
         result = KeyedMatrix()
-        result._keysOut = self.getKeysOut()
-        result._keysIn = set()
-        for r1,v1 in self.items():
+        result.__keys_out = self.getKeysOut()
+        result.__keys_in = set()
+        for r1, v1 in self.items():
             row = {}
-            for c1,value1 in v1.items():
+            for c1, value1 in v1.items():
                 try:
                     col = other[c1].items()
                 except KeyError:
@@ -80,64 +111,70 @@ class KeyedMatrix(dict):
                         col = [(CONSTANT,1)]
                     else:
                         continue
-                for c2,value2 in col:
-                    row[c2] = row.get(c2,0) + value1*value2
-                    result._keysIn.add(c2)
-            result[r1] = KeyedVector(row)
+                for c2, value2 in col:
+                    row[c2] = row.get(c2, 0) + value1*value2
+                    result.__keys_in.add(c2)
+            result.__rows.append((r1, KeyedVector(row)))
         return result
 
-    def mulByVector(self,other):
+    def multiply_vector(self, other):
         result = KeyedVector()
-        for r1,v1 in self.items():
-            for c1,value1 in v1.items():
+        for r1, v1 in self.items():
+            for c1, value1 in v1.items():
                 if c1 in other:
-                    try:
-                        result[r1] += value1*other[c1]
-                    except KeyError:
-                        result[r1] = value1*other[c1]
+                    result[r1] = result.get(r1, 0) + value1*other[c1]
         return result
 
-    def mulByDistribution(self,other):
-        result = VectorDistribution()
-        for vector in other.domain():
-            product = self*vector
-            try:
-                result[product] += other[vector]
-            except KeyError:
-                result[product] = other[vector]
+    def multiply_distribution(self, other):
+        result = other.__class__([(self*vector, prob) for vector, prob in other.items()])
+        result.remove_duplicates()
         return result
 
-    def __mul__(self,other):
+    def __mul__(self, other):
         """
         @warning: Muy destructivo for L{VectorDistributionSet}
         """
-        if isinstance(other,KeyedMatrix):
-            return self.mulByMatrix(other)
-        elif isinstance(other,KeyedVector):
-            return self.mulByVector(other)
-        elif isinstance(other,VectorDistribution):
-            return self.mulByDistribution(other)
+        if isinstance(other, KeyedMatrix):
+            return self.multiply_matrix(other)
+        elif isinstance(other, KeyedVector):
+            return self.multiply_vector(other)
+        elif isinstance(other, VectorDistribution):
+            return self.multiply_distribution(other)
         else:
             raise NotImplementedError
 
-    def __rmul__(self,other):
-        if isinstance(other,KeyedVector):
+    def __rmul__(self, other):
+        if isinstance(other, KeyedVector):
             # Transform vector
-            result = KeyedVector()
-            for key in other.keys():
-                if key in self:
-                    for col in self[key].keys():
-                        try:
-                            result[col] += other[key]*self[key][col]
-                        except KeyError:
-                            result[col] = other[key]*self[key][col]
+            other_items = sorted(other.items())
+            result = {}
+            my_index = 0
+            yr_index = 0
+            while my_index < len(self.__rows):
+                my_key, my_vector = self.__rows[my_index]
+                while yr_index < len(other_items):
+                    yr_key, yr_value = other_items[yr_index]
+                    if my_key == yr_key:
+                        for col, my_value in my_vector.items():
+                            result[col] = result.get(col, 0) + yr_value*my_value
+                        my_index += 1
+                        yr_index += 1
+                        break
+                    elif yr_key < my_key:
+                        result[yr_key] = yr_value
+                        yr_index += 1
+                    else:
+                        my_index += 1
+                        break
                 else:
-                    result[key] = other[key]
-        elif isinstance(other,float) or isinstance(other,int):
-            result = self.__class__()
-            for key,value in self.items():
-                result[key] = other*value
-            return result
+                    break
+            while yr_index < len(other_items):
+                yr_key, yr_value = other_items[yr_index]
+                result[yr_key] = yr_value
+                yr_index += 1
+            return other.__class__(result)
+        elif isinstance(other, float) or isinstance(other, int):
+            return self.__class__([(key, other*vector) for key, vector in self.items()])
         else:
             raise NotImplementedError
         return result
@@ -146,54 +183,47 @@ class KeyedMatrix(dict):
         """
         :returns: a set of keys which affect the result of multiplying by this matrix
         """
-        if self._keysIn is None:
-            self._keysIn = set()
-            self._keysOut = set()
-            for col,row in self.items():
-                self._keysIn |= set(row.keys())
-                self._keysOut.add(col)
-        return self._keysIn
+        if self.__keys_in is None:
+            self.__keys_in = set().union(*[set(item[1].keys()) for item in self.__rows])
+        return self.__keys_in
 
     def getKeysOut(self):
         """
         :returns: a set of keys which are changed as a result of multiplying by this matrix
         """
-        if self._keysOut is None:
-            self.getKeysIn()
-        return self._keysOut
+        if self.__keys_out is None:
+            self.__keys_out = {item[0] for item in self.__rows}
+        return self.__keys_out
 
     def keys(self):
         return self.getKeysIn() | self.getKeysOut()
 
-    def desymbolize(self,table,debug=False):
-        result = self.__class__()
-        for key,row in self.items():
-            result[key] = row.desymbolize(table)
-        return result
+    def desymbolize(self, table, debug=False):
+        return self.__class__([(key, row.desymbolize(table)) for key, row in self.items()])
 
-    def makeFuture(self,keyList=None):
+    def makeFuture(self, keyList=None):
         """
         Transforms matrix so that each row refers to only future keys
         :param keyList: If present, only references to these keys (within each row) are made future
         """
-        return self.changeTense(True,keyList)
+        return self.changeTense(True, keyList)
 
-    def makePresent(self,keyList=None):
-        return self.changeTense(False,keyList)
+    def makePresent(self, keyList=None):
+        return self.changeTense(False, keyList)
     
-    def changeTense(self,future=True,keyList=None):
+    def changeTense(self, future=True, keyList=None):
         """
         Transforms matrix so that each row refers to only future keys
         :param keyList: If present, only references to these keys (within each row) are made future
         """
-        self._string = None
-        self._keysIn = None
-        for key,vector in self.items():
-            vector.changeTense(future,keyList)
+        self.__string = None
+        self.__keys_in = None
+        for key, vector in self.items():
+            vector.changeTense(future, keyList)
             
-    def scale(self,table):
+    def scale(self, table):
         result = self.__class__()
-        for row,vector in self.items():
+        for row, vector in self.items():
             if row in table:
                 result[row] = KeyedVector()
                 lo,hi = table[row]
@@ -218,44 +248,60 @@ class KeyedMatrix(dict):
                 result[row] = KeyedVector(vector)
         return result
         
-    def __setitem__(self,key,value):
+    def __getitem__(self, key):
+        for index, item in enumerate(self.__rows):
+            if item[0] == key:
+                return item[1]
+            elif item[0] > key:
+                # Past where it would be
+                break
+        raise KeyError(f'Matrix missing row for {key}')
+
+    def __setitem__(self, key, value):
         assert isinstance(value,KeyedVector),'Illegal row type: %s' % \
             (value.__class__.__name__)
+        for index, item in enumerate(self.__rows):
+            if item[0] == key:
+                self.__rows[index] = (item[0], value)
+                break
+            elif item[0] > key:
+                # Insertion sort
+                self.__rows.insert(index, (key, value))
+                break
+        else:
+            self.__rows.append((key, value))
         self._string = None
-        dict.__setitem__(self,key,value)
 
-    def update(self,other):
-        self._string = None
-        dict.update(self,other)
+    def update(self, other):
+        self.__string = None
+        my_index = 0
+        yr_index = 0
+        while my_index < len(self):
+            my_key, my_vector = self.__rows[my_index]
+            while yr_index < len(other):
+                yr_key, yr_vector = other.__rows[yr_index]
+                if my_key == yr_key:
+                    self.__rows[my_index] = (my_key, yr_vector)
+                    my_index += 1
+                    yr_index += 1
+                    break
+                elif my_key < yr_key:
+                    my_index += 1
+                    break
+                else: # my_key > yr_key
+                    self.__rows.insert(my_index, (yr_key, yr_vector))
+                    yr_index += 1
+            else:
+                break
+        self.__rows += other.__rows[yr_index:]
 
     def __str__(self):
-        if self._string is None:
-            self._string = '\n'.join(['%s) %s' % (col,vec.hyperString()) for col,vec in sorted(self.items())])
-        return self._string
+        if self.__string is None:
+            self.__string = '\n'.join([f'{col}) {vec.hyperString()}' for col, vec in self.items()])
+        return self.__string
 
     def __hash__(self):
         return hash(tuple(self.items()))
-
-    def __xml__(self):
-        doc = Document()
-        root = doc.createElement('matrix')
-        for key,value in self.items():
-            element = value.__xml__().documentElement
-            element.setAttribute('key',key)
-            root.appendChild(element)
-        doc.appendChild(root)
-        return doc
-
-    def parse(self,element):
-        self._string = None
-        assert element.tagName == 'matrix'
-        node = element.firstChild
-        while node:
-            if node.nodeType == node.ELEMENT_NODE:
-                key = str(node.getAttribute('key'))
-                value = KeyedVector(node)
-                dict.__setitem__(self,key,value)
-            node = node.nextSibling
 
 def dynamicsMatrix(key,vector):
     """
@@ -327,43 +373,3 @@ def setTrueMatrix(key):
     return setToConstantMatrix(key,1)
 def setFalseMatrix(key):
     return setToConstantMatrix(key,0)
-
-class MatrixDistribution(Distribution):
-    def update(self,matrix):
-        original = dict(self)
-        domain = self.domain()
-        self.clear()
-        for old in domain:
-            prob = original[old]
-            if isinstance(matrix,Distribution):
-                # Merge distributions
-                for submatrix in matrix.domain():
-                    new = copy.copy(old)
-                    new.update(submatrix)
-                    self.addProb(new,prob*matrix[submatrix])
-            else:
-                old.update(matrix)
-                self[old] = prob
-
-    def __mul__(self,other):
-        if isinstance(other,Distribution):
-            raise NotImplementedError('Unable to multiply two distributions.')
-        else:
-            result = {}
-            for element in self.domain():
-                try:
-                    result[element*other] += self[element]
-                except KeyError:
-                    result[element*other] = self[element]
-            if isinstance(other,KeyedVector):
-                return VectorDistribution(result)
-            elif isinstance(other,KeyedMatrix):
-                return self.__class__(result)
-            else:
-                raise TypeError('Unable to process multiplication by %s' % (other.__class__.__name__))
-
-    def element2xml(self,value):
-        return value.__xml__().documentElement
-
-    def xml2element(self,key,node):
-        return KeyedMatrix(node)
