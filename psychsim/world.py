@@ -671,9 +671,6 @@ class World(object):
                 for tree in dynamics:
                     remaining |= tree.getKeysIn() - result - {CONSTANT}
         return result
-        
-    def addDependency(self,dependent,independent):
-        raise DeprecationWarning('Dependencies are now determined automatically on a case-by-case basis. Simply use "makeFuture(\'%s\')" in the dynamics for %s' % (independent,dependent))
 
     """------------------"""
     """Turn order methods"""
