@@ -81,6 +81,19 @@ def test_dynamics():
     # No null subdistributions in state
     for dist in world.state.distributions.values():
         assert len(dist) > 0
+    
+def test_legality():
+    world = setup_world()
+    add_state(world)
+    actions = add_actions(world,['Tom'])
+    action = actions['hit']
+    value = world.getState('Tom', 'health', unique=True)
+    tree = makeTree({'if': thresholdRow(stateKey('Tom', 'health'), value-5), True: True, False: False})
+    world.agents['Tom'].setLegal(action, tree)
+    assert action in world.agents['Tom'].getLegalActions()
+    tree = makeTree({'if': thresholdRow(stateKey('Tom', 'health'), value+5), True: True, False: False})
+    world.agents['Tom'].setLegal(action, tree)
+    assert action not in world.agents['Tom'].getLegalActions()
 
 def test_default_branch():
     world = setup_world()
