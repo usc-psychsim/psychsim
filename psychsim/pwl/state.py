@@ -471,7 +471,7 @@ class VectorDistributionSet:
                 # Certain value for this key
                 marginal = self.marginal(key)
                 total += other[key]*next(iter(marginal.domain()))
-        self.join(keys.VALUE,total,destination)
+        self.join(keys.VALUE, total, destination)
         dist = self.distributions[destination]
         for index, item in enumerate(dist._Distribution__items):
             item[0][keys.VALUE] += sum([other[key]*item[0].get(key, 0) for key in other])
@@ -666,14 +666,10 @@ class VectorDistributionSet:
             distribution = self.distributions[substate]
             del self.keyMap[keys.VALUE]
             total = 0.
-            for vector in distribution.domain():
-                prob = distribution[vector]
-                del distribution[vector]
+            for vector, prob in distribution.items():
                 total += prob*vector[keys.VALUE]
                 del vector[keys.VALUE]
-                if len(vector) > 1:
-                    distribution[vector] = prob
-            if len(distribution) == 0:
+            if len(vector) <= 1:
                 del self.distributions[substate]
 #            for s in self.distributions:
 #                assert s in self.keyMap.values(),self.distributions[s]
