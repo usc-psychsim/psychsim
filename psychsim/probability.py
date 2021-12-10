@@ -166,6 +166,12 @@ class Distribution:
         :return: the total probability mass in this distribution
         """
         return sum([item[1] for item in self.__items])
+
+    def is_complete(self, epsilon=None):
+        """
+        :return: True iff the total probability mass is 1 (or within epsilon of 1)
+        """
+        return abs(self.probability()-1) < self.epsilon if epsilon is None else epsilon
         
     def __float__(self):
         return self.expectation()
