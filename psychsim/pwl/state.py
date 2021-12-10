@@ -594,8 +594,11 @@ class VectorDistributionSet:
                     valSub = s.keyMap[keys.VALUE]
                     if s_tuple[1] < 1:
                         # We've already descended along one side of a branch
-                        partials = [substate for substate, dist in self.distributions.items() if dist.probability() < 1]
-                        assert len(partials) == 1, 'Miraculous but incorrect appearance of multiple subdistributions with probability mass < 1'
+                        partials = [substate for substate, dist in self.distributions.items() if not dist.is_complete()]
+                        if len(partials) > 1:
+                            raise ValueError(f'Miraculous but incorrect appearance of multiple subdistributions with probability mass < 1 {[self.distributions[s].probability() for s in partials]}')
+                        elif len(partials) == 0:
+                            raise ValueError(f'Where did all the incompleteness go?')
                         if partials[0] != valSub:
                             # The test result covers a different set of variables than was tested upstream
                             valSub = s.merge([partials[0], valSub])
