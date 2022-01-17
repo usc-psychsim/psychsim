@@ -1181,16 +1181,32 @@ class World(object):
     """Mental model methods"""
     """------------------"""
 
-    def getModel(self,modelee,state=None,unique=False):
+    def getModel(self, modelee, state=None, unique=False):
         """
-        :returns: the name of the model of the given agent indicated by the given state vector
-        :type modelee: str
-        :type state: L{psychsim.pwl.KeyedVector}
+        :returns: the name of the model of the given agent indicated by the given state vector. If the given agent is a list, descends down the recursive beliefs to return the model at the bottom of that recursion
+        :type modelee: str or str[]
+        :type state: L{psychsim.pwl.state.VectorDistributionSet}
         :rtype: str
         """
         if state is None:
             state = self.state
-        return self.getFeature(modelKey(modelee),state,unique)
+        if isinstance(modelee, list):
+            model = self.getModel(modelee[0], state, unique)
+            if len(modelee) > 1:
+                if unique:
+                    if isinstance(modelee[0], str):
+                        return self.getModel(modelee[1:], self.agents[modelee[0]].getBelief(state, model), unique)
+                    else:
+                        return self.getModel(modelee[1:], self.agents[modelee[0].name].getBelief(state, model), unique)
+                else:
+                    raise NotImplementedError('I am currently able to extract recursive mental models only when the result has no uncertainty. In this case, set unique flag to True.')
+            else:
+                return model
+        elif isinstance(modelee, str):
+            return self.getFeature(modelKey(modelee), state, unique)
+        else:
+            # Assume Agent instance
+            return self.getFeature(modelKey(modelee.name), state, unique)
 
     def get_current_models(self, state=None, cycle_check=False, all_models=None, tree=None, recurse=True):
         if state is None:
