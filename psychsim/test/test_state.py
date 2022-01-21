@@ -69,3 +69,12 @@ def test_top_k(num_iterations=10):
 			for element, prob in dist.items():
 				if element not in top:
 					assert prob < floor
+
+def test_prune_k(num_iterations=10, num_elements=10):
+	for i in range(num_iterations):
+		for k in range(2, num_elements):
+			dist = make_distribution(num_elements)
+			total = sum([dist[el] for el in dist.max(k)])
+			prob = dist.prune_size(k)
+			assert len(dist) == k
+			assert prob == total
