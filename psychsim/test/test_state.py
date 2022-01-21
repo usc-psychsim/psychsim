@@ -45,7 +45,7 @@ def make_state(num_vars=5, max_uncertainty=2, num_splits=None):
 def make_distribution(num_elements=10):
 	dist = Distribution()
 	while len(dist) < num_elements:
-		dist.add_prob(gen_float(), gen_float(2))
+		dist.add_prob(gen_float(), gen_float(4))
 	dist.normalize()
 	return dist
 
@@ -58,13 +58,14 @@ def dont_test_max_size(max_size=3, num_iterations=10):
 			print(vec.sortedString())
 		print(s)
 
-def test_top_k():
-	dist = make_distribution()
-	assert abs(sum([tup[1] for tup in dist.items()]) - 1) < 1e-8
-	for k in range(2, len(dist)):
-		top = dist.max(k)
-		assert len(top) == k
-		floor = min([dist[element] for element in top])
-		for element, prob in dist.items():
-			if element not in top:
-				assert prob < floor
+def test_top_k(num_iterations=10):
+	for i in range(num_iterations):
+		dist = make_distribution()
+		assert abs(sum([tup[1] for tup in dist.items()]) - 1) < 1e-8
+		for k in range(2, len(dist)):
+			top = dist.max(k)
+			assert len(top) == k
+			floor = min([dist[element] for element in top])
+			for element, prob in dist.items():
+				if element not in top:
+					assert prob < floor
