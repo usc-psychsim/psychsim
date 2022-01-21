@@ -266,8 +266,34 @@ class Distribution:
         :return: a new Distribution whose probability values have all been multiplied by the given factor
         """
         return self.__class__([(element, prob*factor) for element, prob in self.__items])
-        
+
     def prune(self, epsilon=1e-8):
+        raise DeprecationWarning('Use prune_unlikely instead (to distinguish from prune_size)')
+        
+    def prune_size(self, k):
+        """
+        Remove least likely elements to get domain to size k
+        :returns: the remaining total probability
+        """
+        mass = 1
+        heap = []
+        for i, tup in enumerate(self.__items):
+            element, prob = tup
+            if len(heap) == k:
+                if prob > heap[0][0]:
+                    mass += heap[0][0] - prob
+                    heapq.heappop(heap)
+                    heapq.heappush(heap, (prob, i))
+            else:
+                mass -= prob
+                heapq.heappush(heap, (prob, i))
+            if len(heap) == k and mass < heap[0][0]:
+                break
+        self.__items = [self.__items[tup[1]] for tup in heap]
+        return self.probability()
+
+
+    def prune_unlikely(self, epsilon=1e-8):
         """
         Merge any elements that are within epsilon of each other
         """
