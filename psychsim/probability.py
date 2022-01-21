@@ -225,7 +225,7 @@ class Distribution:
                 else:
                     mass -= prob
                     heapq.heappush(heap, (prob, element))
-                if mass < heap[0][0]:
+                if len(heap) == k and mass < heap[0][0]:
                     break
             return [tup[1] for tup in heap]
 
