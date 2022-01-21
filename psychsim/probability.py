@@ -1,3 +1,4 @@
+import heapq
 import math
 import random
 import sys
@@ -204,12 +205,29 @@ class Distribution:
         self.set(element)
         return prob
 
-    def max(self):
+    def max(self, k=1):
         """
-        :returns: the most probable element in this distribution (breaking ties by returning the highest-valued element)
+        :param k: default is 1
+        :returns: the top k most probable elements in this distribution (breaking ties by returning the highest-valued element)
         """
-        element, prob = max(self.__items, key=lambda item: (item[1], item[0]))
-        return element
+        if k == 1:
+            element, prob = max(self.__items, key=lambda item: (item[1], item[0]))
+            return element
+        else:
+            mass = 1
+            heap = []
+            for element, prob in self.__items:
+                if len(heap) == k:
+                    if prob > heap[0][0]:
+                        mass += heap[0][0] - prob
+                        heapq.heappop(heap)
+                        heapq.heappush(heap, (prob, element))
+                else:
+                    mass -= prob
+                    heapq.heappush(heap, (prob, element))
+                if mass < heap[0][0]:
+                    break
+            return [tup[1] for tup in heap]
 
     def entropy(self):
         """
