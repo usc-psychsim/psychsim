@@ -1,4 +1,5 @@
 import math
+import random
 import sys
 from xml.dom.minidom import Document,Node
 
