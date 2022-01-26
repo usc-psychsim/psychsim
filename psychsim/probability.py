@@ -21,15 +21,17 @@ class Distribution:
             if rationality is None:
                 self.__items = list(args.items())
             else:
-                #if the exponent is too big, then just set the value to the system max float value
-                #self[key] = sys.float_info[0]
-                self.__items = [(element, math.exp(rationality*V)) for element, V in args.items()]
+                # subtract values by max value to avoid overflow
+                max_V = max(args.values())
+                self.__items = [(element, math.exp(rationality*(V-max_V))) for element, V in args.items()]
                 self.normalize()
         elif isinstance(args, list):
             if rationality is None:
                 self.__items = args
             else:
-                self.__items = [(element, math.exp(rationality*V)) for element, V in args]
+                # subtract values by max value to avoid overflow
+                max_V = max(args)
+                self.__items = [(element, math.exp(rationality*(V-max_V))) for element, V in args]
                 self.normalize()
         else:
             self.__items = []
