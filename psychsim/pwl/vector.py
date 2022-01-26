@@ -24,9 +24,8 @@ class KeyedVector(collections.abc.MutableMapping):
             self._data.update(arg)
 
     def prune(self):
-        for key,value in list(self.items()):
-            if abs(value) < self.epsilon:
-                del self[key]
+        self._data = {key: value for key, value in self._data.items() if abs(value) >= self.epsilon}
+        self._string = None
         return self
 
     def __contains__(self,key):
@@ -430,21 +429,20 @@ class VectorDistribution(Distribution):
         self.remove_duplicates()
         return self
 
-    def prune(self, probThreshold, true=None):
-        change = False
-        for vec in self.domain():
-            if self[vec] < probThreshold:
-                if true:
-                    for key in true:
-                        if vec[key] != true[key]:
-                            break
-                    else:
-                        # Has the true state, so don't delete
-                        continue
-                change = True
-                del self[vec]
-        if change:
-            self.normalize()
+    def prune_probability(self, probThreshold, true=None):
+        if true is None:
+            return super().prune_probability(probThreshold)
+        else:
+            raise NotImplementedError('Unable to preserve true state')
+#        for vec in self.domain():
+#            if self[vec] < probThreshold:
+#                if true:
+#                    for key in true:
+#                        if vec[key] != true[key]:
+#                            break
+#                    else:
+#                        # Has the true state, so don't delete
+#                        continue
                 
     def __deepcopy__(self, memo):
         return self.__class__([(vector.__class__(vector), prob) for vector, prob in self.items()])
