@@ -205,29 +205,40 @@ class Distribution:
         self.set(element)
         return prob
 
-    def max(self, k=1):
+    def max(self, k=1, number=1):
         """
         :param k: default is 1
+        :param number of values to return for each element (element if 1, element and probability if 2, element probability and index in domain if 3)
         :returns: the top k most probable elements in this distribution (breaking ties by returning the highest-valued element)
         """
-        if k == 1:
-            element, prob = max(self.__items, key=lambda item: (item[1], item[0]))
-            return element
-        else:
-            mass = 1
-            heap = []
-            for element, prob in self.__items:
-                if len(heap) == k:
-                    if prob > heap[0][0]:
-                        mass += heap[0][0] - prob
-                        heapq.heappop(heap)
-                        heapq.heappush(heap, (prob, element))
-                else:
-                    mass -= prob
-                    heapq.heappush(heap, (prob, element))
-                if len(heap) == k and mass < heap[0][0]:
-                    break
-            return [tup[1] for tup in heap]
+        mass = 1
+        heap = []
+        for index, tup in enumerate(self.__items):
+            element, prob = tup
+            if len(heap) == k:
+                if prob > heap[0][0]:
+                    mass += heap[0][0] - prob
+                    heapq.heapreplace(heap, (prob, element, index))
+            else:
+                mass -= prob
+                heapq.heappush(heap, (prob, element, index))
+            if len(heap) == k and mass < heap[0][0]:
+                break
+        if number == 1:
+            if k == 1:
+                return heap[0][1]
+            else:
+                return [tup[1] for tup in heap]
+        elif number == 2:
+            if k == 1:
+                return (heap[0][1], heap[0][0])
+            else:
+                return [(tup[1], tup[0]) for tup in heap]
+        elif number == 3:
+            if k == 1:
+                return (heap[0][1], heap[0][0], heap[0][2])
+            else:
+                return heap
 
     def entropy(self):
         """
@@ -268,8 +279,20 @@ class Distribution:
         return self.__class__([(element, prob*factor) for element, prob in self.__items])
 
     def prune(self, epsilon=1e-8):
-        raise DeprecationWarning('Use prune_unlikely instead (to distinguish from prune_size)')
-        
+        raise DeprecationWarning('Use prune_probability, prune_elements, or prune_size instead')
+
+    def prune_probability(self, threshold, normalize=False):
+        """
+        Removes any elements in the distribution whose probability is strictly less than the given threshold
+        :param normalize: Normalize distribution after pruning if True (default is False)
+        :return: the probability mass remaining after pruning (and before any normalization)
+        """
+        self.__items = [(element, prob) for element, prob in self.__items if prob >= threshold]
+        prob = self.probability()
+        if normalize:
+            self.normalize()
+        return prob
+
     def prune_size(self, k):
         """
         Remove least likely elements to get domain to size k
@@ -282,8 +305,7 @@ class Distribution:
             if len(heap) == k:
                 if prob > heap[0][0]:
                     mass += heap[0][0] - prob
-                    heapq.heappop(heap)
-                    heapq.heappush(heap, (prob, i))
+                    heapq.heapreplace(heap, (prob, i))
             else:
                 mass -= prob
                 heapq.heappush(heap, (prob, i))
@@ -293,7 +315,7 @@ class Distribution:
         return self.probability()
 
 
-    def prune_unlikely(self, epsilon=1e-8):
+    def prune_elements(self, epsilon=1e-8):
         """
         Merge any elements that are within epsilon of each other
         """
