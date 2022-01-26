@@ -458,8 +458,11 @@ class VectorDistributionSet:
 
     def multiply_vector(self, other):
         substates = self.substate(other)
-        self.collapse(substates)
-        destination = self.findUncertainty(substates)
+        if substates:
+            self.collapse(substates)
+            destination = self.findUncertainty(substates)
+        else:
+            destination = None
         if destination is None:
             destination = len(self.distributions)
             while destination in self.distributions:
@@ -467,7 +470,10 @@ class VectorDistributionSet:
 #                destination = max(self.keyMap.values())+1
         total = 0.
         for key in other:
-            if key != keys.CONSTANT and self.keyMap[key] != destination:
+            if key == keys.CONSTANT and key not in self.keyMap:
+                # Assume CONSTANT value is 1?
+                total += other[key]
+            elif key != keys.CONSTANT and self.keyMap[key] != destination:
                 # Certain value for this key
                 marginal = self.marginal(key)
                 total += other[key]*next(iter(marginal.domain()))
