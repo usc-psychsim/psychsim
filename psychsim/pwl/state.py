@@ -2,6 +2,7 @@ from collections import OrderedDict
 import copy
 import itertools
 import logging
+import math
 import operator
 from xml.dom.minidom import Document,Node
 
@@ -381,9 +382,55 @@ class VectorDistributionSet:
         self.distributions.clear()
         self.keyMap.clear()
 
-    def prune(self,threshold):
+    def prune(self, threshold):
+        raise DeprecationWarning('Use prune_probability or prune_size')
+
+    def prune_probability(self, threshold):
         for dist in self.distributions.values():
-            dist.prune(threshold)
+            dist.prune_probability(threshold)
+
+    def prune_size(self, k=1):
+        if len(self) > k:
+            count = 1
+            dist_list = [dist for dist in self.distributions.values() if len(dist) > 1]
+            max_list = [dist.max(number=3) for dist in dist_list]
+            max_prob = math.prod([tup[1] for tup in max_list])
+            scale_list = [max_prob/tup[1] for tup in max_list]
+            count = [1 for dist in dist_list]
+            size = 1
+            heap = []
+            for i, dist in enumerate(dist_list):
+                for element, tup in enumerate(dist._Distribution__items):
+                    if element != max_list[i][2]:
+                        # This is not the max item (i.e., it is a viable pruning candidate)
+                        total_prob = prob*scale_list[i]
+                        # How many more possible worlds will be added if I add this element
+                        size_delta = math.prod([n for j, n in enumerate(count) if i != j])
+                        if size + size_delta <= k:
+                            # Just add it already
+                            heapq.heappush(heap, (total_prob, i, element))
+                            count[i] += 1
+                            size += size_delta
+                        else:
+                            # Can't add this without removing someone else
+                            if total_prob > heap[0][0]:
+                                # Remove smallest element
+                                count[heap[0][1]] -= 1
+                                size -= math.prod([n for j, n in enumerate(count) if heap[0][1] != j])
+                                heapq.heapreplace(heap, (total_prob, i, element))
+                                count[i] += 1
+                                size += size_delta*count[heap[0][1]]/(count[heap[0][1]]+1)
+                        while size > k:
+                            # Maybe we're still too big?
+                            count[heap[0][1]] -= 1
+                            size -= math.prod([n for j, n in enumerate(count) if heap[0][1] != j])
+                            heapq.heappop(heap)
+            items = [[tup[2]] for tup in max_list]
+            for prob, dist_index, element in heap:
+                items[dist_index].append(element)
+            for i, dist in enumerate(dist_list):
+                dist._Distribution__items = [dist._Distribution__items[element] for element in items[i]]
+        return self.probability()
             
     def update(self,other,keySet,scale=1):
         # Anyone else mixed up in this?
@@ -828,12 +875,15 @@ class VectorDistributionSet:
         return result
     
     def __str__(self):
+        uncertain = '\n---\n'.join([str(dist) for dist in self.distributions.values() if len(dist) > 1])
         certain = [dist for dist in self.distributions.values() if len(dist) == 1]
-        vector = KeyedVector()
-        for dist in certain:
-            vector.update({key: value for key,value in dist.first().items() if key != keys.CONSTANT})
-        return '%s\n%s' % (vector.sortedString(),'\n---\n'.join([str(dist) for dist in self.distributions.values() 
-            if len(dist) > 1]))
+        if certain:
+            vector = KeyedVector()
+            for dist in certain:
+                vector.update({key: value for key,value in dist.first().items() if key != keys.CONSTANT})
+            return f'{vector.sortedString()}\n{uncertain}'
+        else:
+            return uncertain
 
     def copySubset(self, ignore=None, include=None):
         raise DeprecationWarning('Use copy_subset instead')
