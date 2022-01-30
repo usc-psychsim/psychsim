@@ -1,5 +1,6 @@
 from collections import OrderedDict
 import copy
+import heapq
 import itertools
 import logging
 import math
@@ -261,7 +262,7 @@ class VectorDistributionSet:
         """
         # Convert to lists now to ensure same ordering throughout
         substates = list(self.distributions.keys())
-        domains = {substate: self.distributions[substate].domain() for substate in substates}
+        domains = {substate: list(self.distributions[substate].domain()) for substate in substates}
         for index in range(len(self)):
             vector = {}
             prob = 1
@@ -401,6 +402,7 @@ class VectorDistributionSet:
             heap = []
             for i, dist in enumerate(dist_list):
                 for element, tup in enumerate(dist._Distribution__items):
+                    obj, prob = tup
                     if element != max_list[i][2]:
                         # This is not the max item (i.e., it is a viable pruning candidate)
                         total_prob = prob*scale_list[i]
@@ -868,7 +870,7 @@ class VectorDistributionSet:
 
     def __deepcopy__(self,memo):
         result = self.__class__()
-        for substate,distribution in self.distributions.items():
+        for substate, distribution in self.distributions.items():
             new = copy.deepcopy(distribution)
             result.distributions[substate] = new
         result.keyMap.update(self.keyMap)
