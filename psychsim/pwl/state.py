@@ -957,4 +957,23 @@ class VectorDistributionSet:
                             # This feature is 100% certain, yet exists in a distribution that is uncertain
                             return False
         else:
-            return True                            
+            return True
+
+    def diff(self, other):
+        """
+        :return: a dictionary of differences between me and the given state
+        """
+        result = {'only_me': self.keys() - other.keys(),
+            'only_you': other.keys() - self.keys(),
+            'dependency mismatch': {},
+            'probability mismatch': set()}
+        for key in self.keys() & other.keys():
+            if self.marginal(key) != other.marginal(key):
+                result['probability mismatch'].add(key)
+            dist_me = self.distributions[self.keyMap[key]]
+            dist_you = other.distributions[other.keyMap[key]]
+            match = dist_me.keys() & dist_you.keys()
+            mismatch = (dist_me.keys() | dist_you.keys()) - match
+            if mismatch:
+                result['dependency mismatch'][key] = mismatch
+        return result
