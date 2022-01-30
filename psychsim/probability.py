@@ -71,10 +71,15 @@ class Distribution:
 
     def __eq__(self, other):
         return set(self.__items) == set(other.__items)
-        
+
     def items(self):
         return iter(self.__items)
 
+    def values(self):
+        return (item[1] for item in self.__items)
+
+    def keys(self):
+        return self.domain()
 
     def add_prob(self, element, probability):
         """
