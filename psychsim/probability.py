@@ -69,6 +69,9 @@ class Distribution:
         else:
             self.__items.append((element, probability))
 
+    def __eq__(self, other):
+        return set(self.__items) == set(other.__items)
+        
     def items(self):
         return iter(self.__items)
 
