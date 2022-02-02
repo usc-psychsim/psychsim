@@ -207,6 +207,8 @@ class World(object):
                     action = keys.actionKey(name)
                     if name in actions:
                         # Translate any pre-specified actions into PWL policy
+                        if isinstance(actions[name], Action):
+                            actions[name] = ActionSet([actions[name]])
                         if isinstance(actions[name],ActionSet):
                             choices[name] = [actions[name]]
                             policies[name] = makeTree(setToConstantMatrix(action,actions[name])).desymbolize(self.symbols)
@@ -962,7 +964,8 @@ class World(object):
         if state is None:
             state = self.state
         if isinstance(state,VectorDistributionSet):
-            if noclobber and key in state.keys() and len(state.subDistribution(key).keys()) > 2:
+            if noclobber:
+#             and key in state.keys() and len(state.subDistribution(key).keys()) > 2:
                 # Posterior update using existing distribution
                 if isinstance(value,Distribution):
                     raise TypeError('Unable to set posterior distribution on %s within joint distribution over %s' % 
