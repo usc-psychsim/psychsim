@@ -119,10 +119,17 @@ class VectorDistributionSet:
                 raise ValueError('P({}={}) = 0 because {}={}'.format(key, value, key, self.certain[key]))
         else:
             dist = self.distributions[substate]
-            for vector in dist.domain():
-                if abs(vector[key]-value) > 1e-8:
-                    del dist[vector]
-            dist.normalize()
+            items = dist._Distribution__items
+            i = 0
+            while i < len(items):
+                if abs(items[i][0][key]-value) > 1e-8:
+                    del items[i]
+                else:
+                    i += 1
+            if len(items) == 0:
+                raise ValueError(f'P({key}={value}) = 0)')
+            else:
+                dist.normalize()
         
     def subDistribution(self,key):
         """
@@ -382,6 +389,10 @@ class VectorDistributionSet:
     def clear(self):
         self.distributions.clear()
         self.keyMap.clear()
+
+    def normalize(self):
+        for dist in self.distributions.values():
+            dist.normalize()
 
     def prune(self, threshold):
         raise DeprecationWarning('Use prune_probability or prune_size')
