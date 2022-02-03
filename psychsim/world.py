@@ -249,8 +249,8 @@ class World(object):
                 keySet = [k for k in keySet if k in state]
             if len(keySet) > 0:
                 keyOrder.append(keySet)
-        if TERMINATED in state:
-            keyOrder.append({TERMINATED})
+#        if TERMINATED in state:
+#            keyOrder.append({TERMINATED})
         count = 0
         effects = []
         for keySet in keyOrder:
@@ -366,10 +366,10 @@ class World(object):
 
         # Termination state info
         if not TERMINATED in self.variables:
-            self.defineVariable(TERMINATED,bool,description="True if and only if a '\
-            'termination condition for this simulation is satisfied")
-            self.setFeature(TERMINATED,False)
-        self.setDynamics(TERMINATED,action,tree)
+            self.defineState(state2agent(TERMINATED), state2feature(TERMINATED), bool,
+                description="True if and only if a termination condition for this simulation is satisfied")
+            self.setFeature(TERMINATED, False)
+        self.setDynamics(TERMINATED, action, tree)
 
     def terminated(self,state=None):
         """
