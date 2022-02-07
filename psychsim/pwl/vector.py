@@ -28,7 +28,7 @@ class KeyedVector(collections.abc.MutableMapping):
         self._string = None
         return self
 
-    def __contains__(self,key):
+    def __contains__(self, key):
         return key in self._data
     
     def __eq__(self,other):
