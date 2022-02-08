@@ -773,20 +773,15 @@ def makeTree(table):
         return tree
     elif 'case' in table:
         # Non-binary deterministic branch
-        keys = set(table.keys())
+        keys = list(table.keys())
         keys.remove('case')
+        tree = {}
         if 'otherwise' in table:
-            tree = table['otherwise']
+            tree[None] = table['otherwise']
             keys.remove('otherwise')
-        else:
-            # No default, assume entries are exhaustive and take anyone as the last
-            tree = table[keys.pop()]
-        for key in keys:
-            if isinstance(table['case'],str):
-                tree = {'if': equalRow(table['case'],key),
-                        True: table[key], False: tree}
-            else:
-                raise NotImplementedError
+        tree['if'] = equalRow(table['case'], keys)
+        for index, key in enumerate(keys):
+            tree[index] = table[key]
         return makeTree(tree)
     elif 'distribution'in table:
         # Probabilistic branch
