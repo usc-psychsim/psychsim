@@ -56,7 +56,7 @@ def test_top_k(num_iterations=10):
 		assert abs(sum([tup[1] for tup in dist.items()]) - 1) < 1e-8
 		top = dist.max()
 		for element, prob in dist.items():
-			if element != dist:
+			if element != top:
 				assert prob <= dist[top]
 		for k in range(2, len(dist)):
 			top = dist.max(k)
@@ -70,7 +70,14 @@ def test_prune_k(num_iterations=10, num_elements=10):
 	for i in range(num_iterations):
 		for k in range(2, num_elements):
 			dist = make_distribution(num_elements)
+			original = list(dist.items())
 			total = sum([dist[el] for el in dist.max(k)])
 			prob = dist.prune_size(k)
 			assert len(dist) == k
 			assert prob == total
+			floor = min([p for el, p in dist.items()])
+			for item, prob in original:
+				if item in dist.domain():
+					assert prob >= floor
+				else:
+					assert prob <= floor
