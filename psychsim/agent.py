@@ -230,7 +230,7 @@ class Agent(object):
         if selection is None:
             selection = self.getAttribute('selection',model)
         # What are my subjective beliefs for this decision?
-        belief = self.getBelief(state,model)
+        belief = self.getBelief(state, model)
         # Identify candidate actions
         if actions is None:
             # Consider all legal actions (legality determined by my belief, circumscribed by real world)
@@ -759,11 +759,11 @@ class Agent(object):
     """State methods"""
     """------------------"""
 
-    def setState(self, feature, value, state=None, recurse=False):
+    def setState(self, feature, value, state=None, noclobber=False, recurse=False):
         """
         :param recurse: if True, set this feature to the given value for all agents' beliefs (and beliefs of beliefs, etc.)
         """        
-        return self.world.setState(self.name, feature, value, state, recurse)
+        return self.world.setState(self.name, feature, value, state, noclobber, recurse)
 
     def getState(self,feature,state=None,unique=False):
         return self.world.getState(self.name,feature,state,unique)
@@ -897,9 +897,11 @@ class Agent(object):
             beliefs = True
         if beliefs is True:
             beliefs = self.resetBelief(model)
-        if isinstance(agents,str):
+        if isinstance(agents, str):
             for key in list(beliefs.keys()):
-                if state2agent(key) == agents:
+                if isStateKey(key) and state2agent(key) == agents:
+                    del beliefs[key]
+                elif isBinaryKey(key) and agents in key2relation(key).values():
                     del beliefs[key]
 #            del beliefs[keys.turnKey(agents)]
 #            del beliefs[keys.modelKey(agents)]
