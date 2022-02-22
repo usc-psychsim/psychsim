@@ -150,13 +150,14 @@ class World(object):
             state = copy.deepcopy(state)
         actions = act2dict(actions)
         # Determine the actions taken by the agents in this world
-        state,policies,choices = self.deltaAction(state,actions,horizon,tiebreak,keySubset,debug, context)
+        state, policies, choices = self.deltaAction(state,actions,horizon,tiebreak,keySubset,debug, context)
         # Compute the effect of the chosen actions
         effect = self.deltaState(choices,state,keySubset)
         # Update turn order
         effect.append(self.deltaTurn(state,policies))
         for stage in effect:
             state = self.applyEffect(state,stage,select)
+            state.make_certain()
         # The future becomes the present
         state.rollback()
         if updateBeliefs:
@@ -169,10 +170,6 @@ class World(object):
             for name in agents_modeled:
                 key = modelKey(name)
                 agent = self.agents[name]
-                if isinstance(agent.omega, list):
-                    substate = state.collapse(agent.omega+[key], False)
-                else:
-                    substate = None
                 agent.updateBeliefs(state, policies, horizon=horizon, context=context)
                 substate = state.keyMap[makeFuture(key)]
                 if select and substate is not None:
@@ -723,13 +720,16 @@ class World(object):
             for key in self.turnKeys:
                 if key in vector.keyMap:
                     substate = vector.keyMap[key]
-                    subvector = vector.distributions[substate]
-                    if len(subvector) == 1:
-                        value = subvector.first()[key]
+                    if substate is None:
+                        value = vector.certain[key]
                     else:
-                        dist = subvector.marginal(key)
-                        assert len(dist) == 1,'World.next() does not operate on uncertain turns:\n%s' % (dist)
-                        value = dist.first()
+                        subvector = vector.distributions[substate]
+                        if len(subvector) == 1:
+                            value = subvector.first()[key]
+                        else:
+                            dist = subvector.marginal(key)
+                            assert len(dist) == 1,'World.next() does not operate on uncertain turns:\n%s' % (dist)
+                            value = dist.first()
                     if value == 0:
                         agents.add(turn2name(key))
             return agents
@@ -1085,7 +1085,7 @@ class World(object):
         """
         if state is None:
             state = self.state
-        assert key in self.variables,'Unknown element "%s"' % (key)
+        assert key in self.variables or makePresent(key) in self.variables,'Unknown element "%s"' % (key)
         if isinstance(state,KeyedVector):
             return self.float2value(key,state[key])
         else:
