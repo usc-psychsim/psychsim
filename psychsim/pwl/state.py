@@ -132,6 +132,9 @@ class VectorDistributionSet:
                 dist.normalize()
         
     def subDistribution(self,key):
+        raise DeprecationWarning('Use "subdistribution" instead.')
+
+    def subdistribution(self,key):
         """
         :return: the minimal joint distribution containing this key
         """
@@ -224,7 +227,7 @@ class VectorDistributionSet:
                 substates = self.substate(substates)
             if preserve_certainty:
                 substates = {s for s in substates
-                             if len(self.distributions[s]) > 1}
+                             if s is not None and len(self.distributions[s]) > 1}
             result = self.merge(substates)
             return result
         else:
@@ -246,10 +249,21 @@ class VectorDistributionSet:
         if substates is None:
             substates = self.distributions.keys()
         for substate in substates:
-            if len(self.distributions[substate]) > 1:
+            if substate is not None and len(self.distributions[substate]) > 1:
                 return substate
         else:
             return None
+
+    def make_certain(self):
+        for substate, dist in list(self.distributions.items()):
+            if len(dist) == 1:
+                # 100% probability for one vector
+                vector = dist.first()
+                for var, value in vector.items():
+                    if var != keys.CONSTANT:
+                        self.keyMap[var] = None
+                        self.certain[var] = value
+                del self.distributions[substate]
 
     def vector(self):
         """
@@ -306,7 +320,7 @@ class VectorDistributionSet:
             raise DeprecationWarning('If you really need this, please inform management.')
             return set()
         elif ignoreCertain:
-            return {self.keyMap[k] for k in obj if k != keys.CONSTANT and len(self.distributions[self.keyMap[k]]) > 1}
+            return {self.keyMap[k] for k in obj if k != keys.CONSTANT and self.keyMap[k] is not None and len(self.distributions[self.keyMap[k]]) > 1}
         else:
             return {self.keyMap[k] for k in obj if k != keys.CONSTANT}
 
@@ -318,7 +332,7 @@ class VectorDistributionSet:
         for substate in substates:
             if destination is None:
                 destination = substate
-            else:
+            elif substate is not None:
                 dist = self.distributions[substate]
                 self.distributions[destination].merge(dist,True)
                 del self.distributions[substate]
@@ -338,22 +352,40 @@ class VectorDistributionSet:
         if key in self.keyMap:
             assert substate is None, f'Cannot join {key} to distribution {substate} as it already exists in distribution {self.keyMap[key]}'
             substate = self.keyMap[key]
-        else:
-            if substate is None:
+            if substate is not None:
+                self.distributions[substate].delete_column(key)
+        if substate is None:
+            if isinstance(value, Distribution):
                 substate = 0
                 while substate in self.distributions:
                     substate += 1
+                self.keyMap[key] = substate
+            else:
+                # Certain value
+                self.keyMap[key] = substate = None
+        else:
             self.keyMap[key] = substate
-        if not substate in self.distributions:
-            self.distributions[substate] = VectorDistribution([(KeyedVector({keys.CONSTANT:1}), 1)])
-        return self.distributions[substate].join(key, value)
+        if substate is None:
+            self.certain[key] = value
+        else:
+            if not substate in self.distributions:
+                self.distributions[substate] = VectorDistribution([(KeyedVector({keys.CONSTANT:1}), 1)])
+            self.distributions[substate].join(key, value)
 
     def marginal(self,key):
-        return self.distributions[self.keyMap[key]].marginal(key)
+        substate = self.keyMap[key]
+        if substate is None:
+            return Distribution({self.certain[key]: 1})
+        else:
+            return self.distributions[substate].marginal(key)
 
-    def domain(self,key):
+    def domain(self, key):
         if isinstance(key,str):
-            return {v[key] for v in self.distributions[self.keyMap[key]].domain()}
+            substate = self.keyMap[key]
+            if substate is None:
+                return [self.certain[key]]
+            else:
+                return {v[key] for v in self.distributions[substate].domain()}
         elif isinstance(key,list):
             # Identify the relevant subdistributions
             substates = OrderedDict()
@@ -561,7 +593,10 @@ class VectorDistributionSet:
                         total += weight
                     else:
                         substate = self.keyMap[colKey]
-                        value = self.distributions[substate].first()[colKey]
+                        if substate is None:
+                            value = self.certain[colKey]
+                        else:
+                            value = self.distributions[substate].first()[colKey]
                         total += weight*value
 #                assert not rowKey in self.keyMap,'%s already exists' % (rowKey)
                 destination = len(self.distributions)
@@ -762,32 +797,43 @@ class VectorDistributionSet:
             future = keys.makeFuture(now)
             futureSub = self.keyMap[future]
             del self.keyMap[future]
-            distribution = self.distributions[nowSub]
-            items = list(distribution.items())
-            distribution.clear()
-            for vector, prob in items:
-                if nowSub == futureSub:
-                    # Kill two birds with one stone
-                    vector[now] = vector[future]
-                    del vector[future]
+            if nowSub is None:
+                if futureSub is None:
+                    self.certain[now] = self.certain[future]
+                    del self.certain[future]
                 else:
-                    del vector[now]
-                if len(vector) > 1:
-                    distribution.add_prob(vector, prob)
-                elif len(vector) == 1 and debug:
-                    assert next(iter(vector.keys())) == keys.CONSTANT
-            if nowSub != futureSub:
-                # Kill two birds with two stones
-                if len(distribution) == 0:
-                    del self.distributions[nowSub]
-                self.keyMap[now] = futureSub
-                distribution = self.distributions[futureSub]
+                    del self.certain[now]
+                distribution = None
+            else:
+                distribution = self.distributions[nowSub]
                 items = list(distribution.items())
                 distribution.clear()
                 for vector, prob in items:
-                    vector[now] = vector[future]
-                    del vector[future]
-                    distribution.add_prob(vector, prob)
+                    if nowSub == futureSub:
+                        # Kill two birds with one stone
+                        vector[now] = vector[future]
+                        del vector[future]
+                    else:
+                        del vector[now]
+                    if len(vector) > 1:
+                        distribution.add_prob(vector, prob)
+                    elif len(vector) == 1 and debug:
+                        assert next(iter(vector.keys())) == keys.CONSTANT
+            if nowSub != futureSub:
+                # Kill two birds with two stones
+                if distribution is not None and len(distribution) == 0:
+                    del self.distributions[nowSub]
+                self.keyMap[now] = futureSub
+                if futureSub is None:
+                    self.certain[now] = self.certain[future]
+                else:
+                    distribution = self.distributions[futureSub]
+                    items = list(distribution.items())
+                    distribution.clear()
+                    for vector, prob in items:
+                        vector[now] = vector[future]
+                        del vector[future]
+                        distribution.add_prob(vector, prob)
             if debug:
                 assert now in self.keyMap
                 assert self.keyMap[now] in self.distributions,now
@@ -863,11 +909,20 @@ class VectorDistributionSet:
         else:
             while remaining:
                 key = remaining.pop()
-                distributionMe = self.distributions[self.keyMap[key]]
-                distributionYou = other.distributions[other.keyMap[key]]
-                if distributionMe != distributionYou:
+                if self.keyMap[key] is None:
+                    if other.keyMap[key] is None:
+                        if self.certain[key] != other.certain[key]:
+                            return False
+                    else:
+                        return False
+                elif other.keyMap[key] is None:
                     return False
-                remaining -= set(distributionMe.keys())
+                else:
+                    distributionMe = self.distributions[self.keyMap[key]]
+                    distributionYou = other.distributions[other.keyMap[key]]
+                    if distributionMe != distributionYou:
+                        return False
+                    remaining -= set(distributionMe.keys())
             return True
 
     def delete_value(self, key, value):
@@ -885,6 +940,7 @@ class VectorDistributionSet:
             new = copy.deepcopy(distribution)
             result.distributions[substate] = new
         result.keyMap.update(self.keyMap)
+        result.certain.update(self.certain)
         return result
     
     def __str__(self):
@@ -914,19 +970,23 @@ class VectorDistributionSet:
             keySubset = include - ignore
         for key in keySubset:
             if key not in result and key in self:
-                distribution = self.distributions[self.keyMap[key]]
-                substate = len(result.distributions)
-                result.distributions[substate] = distribution.__class__()
-                intersection = distribution.keys() & keySubset #[k for k in distribution.keys() if k in keySubset]
-                for subkey in intersection:
-                    result.keyMap[subkey] = substate
-                new_dist = []
-                for vector, prob in distribution.items():
-                    new_dict = {subkey: vector[subkey] for subkey in intersection}
-                    new_dict[keys.CONSTANT] = 1
-                    new_dist.append((vector.__class__(new_dict), prob))
-                result.distributions[substate] = VectorDistribution(new_dist)
-                result.distributions[substate].remove_duplicates()
+                if self.keyMap[key] is None:
+                    result.certain[key] = self.certain[key]
+                    result.keyMap[key] = None
+                else:
+                    distribution = self.distributions[self.keyMap[key]]
+                    substate = len(result.distributions)
+                    result.distributions[substate] = distribution.__class__()
+                    intersection = distribution.keys() & keySubset #[k for k in distribution.keys() if k in keySubset]
+                    for subkey in intersection:
+                        result.keyMap[subkey] = substate
+                    new_dist = []
+                    for vector, prob in distribution.items():
+                        new_dict = {subkey: vector[subkey] for subkey in intersection}
+                        new_dict[keys.CONSTANT] = 1
+                        new_dist.append((vector.__class__(new_dict), prob))
+                    result.distributions[substate] = VectorDistribution(new_dist)
+                    result.distributions[substate].remove_duplicates()
         return result
                     
     def verifyIntegrity(self,sumToOne=False):
@@ -951,12 +1011,15 @@ class VectorDistributionSet:
         """
         substate = self.keyMap[old_key]
         self.keyMap[new_key] = substate
-        dist = self.distributions[substate]
-        for vector in dist.domain():
-            prob = dist[vector]
-            del dist[vector]
-            vector[new_key] = vector[old_key]
-            dist[vector] = prob
+        if substate is None:
+            self.certain[new_key] = self.certain[old_key]
+        else:
+            dist = self.distributions[substate]
+            for vector in dist.domain():
+                prob = dist[vector]
+                del dist[vector]
+                vector[new_key] = vector[old_key]
+                dist[vector] = prob
 
     def is_minimal(self):
         """
