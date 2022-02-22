@@ -15,3 +15,16 @@ def test_constant_comparison():
 	world.setOrder([{a.name}])
 
 	world.step()	
+
+def test_nochange():
+	world = World()
+	x = world.defineState(WORLD, 'x', bool)
+	world.setFeature(x, False)
+	y = world.defineState(WORLD, 'y', bool)
+	world.setFeature(y, False)
+	world.setDynamics(y, True, makeTree({'if': trueRow(makeFuture(x)), True: setTrueMatrix(y), False: setFalseMatrix(y)}))
+	a = world.addAgent('Agent')
+	a.addAction({'verb': 'noop'})
+	world.setOrder([{a.name}])
+
+	world.step()
