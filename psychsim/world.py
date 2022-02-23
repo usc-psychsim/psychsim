@@ -180,7 +180,7 @@ class World(object):
         if select:
             state.select(select=='max')
         if threshold is not None:
-            state.prune(threshold)
+            state.prune_probability(threshold)
         if self.memory:
             self.history.append(copy.deepcopy(state))
            # self.modelGC(False)
