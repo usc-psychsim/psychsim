@@ -890,24 +890,21 @@ class Agent(object):
     """Mental model methods"""
     """------------------"""
 
-    def ignore(self,agents,model=None):
-        try:
-            beliefs = self.models[model]['beliefs']
-        except KeyError:
-            beliefs = True
+    def ignore(self, agents, model=None):
+        if model is None:
+            model = self.get_true_model()
+        beliefs = self.models[model]['beliefs']
         if beliefs is True:
-            beliefs = self.resetBelief(model)
+            beliefs = self.create_belief_state(model)
         if isinstance(agents, str):
             for key in list(beliefs.keys()):
                 if isStateKey(key) and state2agent(key) == agents:
                     del beliefs[key]
                 elif isBinaryKey(key) and agents in key2relation(key).values():
                     del beliefs[key]
-#            del beliefs[keys.turnKey(agents)]
-#            del beliefs[keys.modelKey(agents)]
         else:
-            beliefs.deleteKeys([keys.turnKey(a) for a in agents]+
-                               [keys.modelKey(a) for a in agents])
+            for name in agents:
+                self.ignore(name, model)
 
     def addModel(self,name,**kwargs):
         """
