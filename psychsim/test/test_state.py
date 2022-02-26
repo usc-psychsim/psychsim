@@ -1,6 +1,7 @@
 from psychsim.probability import *
 from psychsim.pwl import *
 
+import copy
 import random
 
 random.seed()
@@ -48,7 +49,23 @@ def make_distribution(num_elements=10):
 
 def test_max_size(max_size=3, num_iterations=10):
 	for i in range(num_iterations):
-		s = make_state(num_splits=1)
+		s = make_state(num_splits=1, max_uncertainty=8)
+		print(s)
+		old = sorted([(world, prob) for world, prob in s.worlds()], key=lambda tup: tup[1], reverse=True)
+		for world, prob in old:
+			print(f'{prob} {world.items()}')
+		s.prune_size(max_size)
+		assert len(s) <= max_size
+		print(s)
+		for world, prob in sorted([(world, prob) for world, prob in s.worlds()], key=lambda tup: tup[1], reverse=True):
+			print(f'{prob} {world.items()}')
+		now = Distribution([(world, prob) for world, prob in s.worlds()])
+		floor = min(now.values())
+		for world, prob in old:
+			if world in now.domain():
+				assert prob >= floor
+			else:
+				assert prob <= floor
 
 def test_top_k(num_iterations=10):
 	for i in range(num_iterations):
