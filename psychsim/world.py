@@ -308,6 +308,10 @@ class World(object):
                         print('Applying effect on %s' % (key))
                         print('Effect tree is\n%s' % (tree))
                         raise
+                    except ValueError:
+                        print('Applying effect on %s' % (key))
+                        print('Effect tree is\n%s' % (tree))
+                        raise
                 else:
                     cumulative = None
                     for tree in dynamics:
@@ -1538,12 +1542,13 @@ class World(object):
     def resymbolize(self, state=None):
         if state is None:
             state = self.state
-        if isinstance(state, KeyedVector):
-            return state.__class__({key: self.float2value(key,value) for key,value in state.items() if key != CONSTANT})
+        if isinstance(state, KeyedVector) or isinstance(state, dict):
+            return state.__class__({key: self.float2value(key, value) for key, value in state.items() if key != CONSTANT})
         elif isinstance(state, VectorDistribution):
-            return state.__class__({self.resymbolize(vector): prob for vector,prob in state.items()})
+            return state.__class__({self.resymbolize(vector): prob for vector, prob in state.items()})
         elif isinstance(state, VectorDistributionSet):
             result = state.__class__()
+            result.certain = self.resymbolize(state.certain)
             for substate,distribution in state.distributions.items():
                 result.distributions[substate] = self.resymbolize(distribution)
                 for key in distribution.keys():
@@ -1578,7 +1583,7 @@ class World(object):
         """
         if distribution is None:
             distribution = self.state
-        print(prefix+str(self.resymbolize(distribution)).replace('\n','\n%s' % (prefix)),file=buf)
+        print(prefix+str(self.resymbolize(distribution)).replace('\n', '\n%s' % (prefix)), file=buf)
         if beliefs:
             if models is None:
                 models = set()
