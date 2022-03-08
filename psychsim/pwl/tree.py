@@ -528,8 +528,7 @@ class KeyedTree:
             # Deterministic branch
             return self.children[self.branch.evaluate(vector)].sampleLeaf(vector,mostlikely)
 
-
-    def sample(self,mostlikely=False,vector=None):
+    def sample(self, mostlikely=False, vector=None):
         """
         :param mostlikely: if True, then only the most likely branches are chosen at each probabilistic branch
         :type mostlikely: bool
