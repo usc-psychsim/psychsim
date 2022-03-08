@@ -31,10 +31,10 @@ class KeyedVector(collections.abc.MutableMapping):
     def __contains__(self, key):
         return key in self._data
     
-    def __eq__(self,other):
+    def __eq__(self, other):
         delta = 0.
         tested = {}
-        for key,value in self.items():
+        for key, value in self.items():
             try:
                 delta += abs(value-other[key])
             except KeyError:
@@ -297,7 +297,7 @@ class VectorDistribution(Distribution):
 #            args = {KeyedVector({keys.CONSTANT:1}):1}
 #        Distribution.__init__(self,args)
 
-    def __contains__(self,key):
+    def __contains__(self, key):
         return key in self.first()
 
     def keys(self):
