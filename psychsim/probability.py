@@ -1,8 +1,7 @@
 import heapq
 import math
 import random
-import sys
-from xml.dom.minidom import Document,Node
+
 
 class Distribution:
     """
@@ -323,7 +322,6 @@ class Distribution:
                 break
         self.__items = [self.__items[tup[1]] for tup in heap]
         return self.probability()
-
 
     def prune_elements(self, epsilon=1e-8):
         """
