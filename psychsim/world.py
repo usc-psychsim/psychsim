@@ -1,15 +1,12 @@
 from __future__ import print_function
 import bz2
 import copy
-import logging
-import multiprocessing
 import os
 import pickle
-import time
-from xml.dom.minidom import Document,Node,parseString
+from xml.dom.minidom import Node, parseString
 
-from psychsim.action import *
-import psychsim.probability
+from psychsim.action import act2dict, Action, ActionSet
+from psychsim.probability import Distribution
 from psychsim.pwl import *
 from psychsim.agent import Agent
 import psychsim.graph
@@ -17,6 +14,7 @@ try:
     from psychsim.ui.diagram import Diagram
 except:
     pass
+
 
 class World(object):
     """
@@ -126,17 +124,22 @@ class World(object):
     """Simulation methods"""
     """------------------"""
                 
-    def step(self,actions=None,state=None,real=True,select=False,keySubset=None,
-             horizon=None,tiebreak=None,updateBeliefs=True,debug={},threshold=None, context=''):
+    def step(self, actions=None, state=None, real=True, select=False, 
+             keySubset=None, horizon=None, tiebreak=None, updateBeliefs=True,
+             debug={}, threshold=None, context=''):
         """
         The simulation method
-        :param actions: optional argument setting a subset of actions to be performed in this turn
+        :param actions: optional argument setting a subset of actions to be 
+        performed in this turn
         :type actions: strS{->}L{ActionSet}
-        :param state: optional initial state distribution (default is the current world state distribution)
+        :param state: optional initial state distribution (default is the 
+        current world state distribution)
         :type state: L{VectorDistribution}
-        :param real: if C{True}, then modify the given state; otherwise, this is only hypothetical (default is C{True})
+        :param real: if C{True}, then modify the given state; otherwise, this 
+        is only hypothetical (default is C{True})
         :type real: bool
-        :param float threshold: Outcomes with a likelihood below this threshold are pruned (default is None, no pruning)
+        :param float threshold: Outcomes with a likelihood below this threshold
+        are pruned (default is None, no pruning)
         """
         if state is None:
             state = self.state
@@ -150,13 +153,17 @@ class World(object):
             state = copy.deepcopy(state)
         actions = act2dict(actions)
         # Determine the actions taken by the agents in this world
-        state, policies, choices = self.deltaAction(state,actions,horizon,tiebreak,keySubset,debug, context)
+        state, policies, choices = self.deltaAction(state, actions, horizon,
+                                                    tiebreak, keySubset, debug,
+                                                    context)
+        if select:
+            raise RuntimeError
         # Compute the effect of the chosen actions
         effect = self.deltaState(choices,state,keySubset)
         # Update turn order
-        effect.append(self.deltaTurn(state,policies))
+        effect.append(self.deltaTurn(state, policies))
         for stage in effect:
-            state = self.applyEffect(state,stage,select)
+            state = self.applyEffect(state, stage, select)
             state.make_certain()
         # The future becomes the present
         state.rollback()
@@ -178,13 +185,13 @@ class World(object):
             state.rollback()
 
         if select:
-            state.select(select=='max')
+            state.select(select == 'max')
         if threshold is not None:
             state.prune_probability(threshold)
             state.normalize()
         if self.memory:
             self.history.append(copy.deepcopy(state))
-           # self.modelGC(False)
+        # self.modelGC(False)
         return state
 
     def deltaAction(self,state=None,actions=None,horizon=None,tiebreak=None,keySubset=None,debug={}, context=''):
@@ -215,9 +222,7 @@ class World(object):
                             choices[name] = {m[makeFuture(action)][CONSTANT] for m in policies[name].leaves()}
                     else:
                         agent = self.agents[name]
-                        decision = self.agents[name].decide(state,horizon,actions,None,tiebreak,None,debug=debug.get(name,{}),
-                            context=context)
-        #                                                    agent.getLegalActions(state),debug=debug.get(name,{}))
+                        decision = self.agents[name].decide(state, horizon, actions, None, tiebreak, None, debug=debug.get(name, {}), context=context)
                         if name in debug:
                             debug[name]['__decision__'] = decision
                         try:
@@ -959,7 +964,7 @@ class World(object):
         :type state: L{VectorDistribution}
         :param recurse: if True, set this feature to the given value for all agents' beliefs (and beliefs of beliefs, etc.)
         """
-        assert key in self.variables,'Unknown element "%s"' % (key)
+        assert key in self.variables, 'Unknown element "%s"' % (key)
 #        if state is None or state is self.state:
 #            for agent in self.agents.values():
 #                for model in agent.models.values():
@@ -968,29 +973,38 @@ class World(object):
 #                        raise RuntimeError('Set all variable values before setting beliefs')
         if state is None:
             state = self.state
-        if isinstance(state,VectorDistributionSet):
+        if isinstance(state, VectorDistributionSet):
             if noclobber:
-#             and key in state.keys() and len(state.subDistribution(key).keys()) > 2:
                 # Posterior update using existing distribution
-                if isinstance(value,Distribution):
+                if isinstance(value, Distribution):
                     raise TypeError('Unable to set posterior distribution on %s within joint distribution over %s' % 
-                        (key,', '.join(sorted({key for key in state.subDistribution(key).keys() if key != CONSTANT}))))
+                        (key, ', '.join(sorted({key for key in state.subDistribution(key).keys() if key != CONSTANT}))))
                 else:
-                    state[key] = self.value2float(key,value)
+                    state[key] = self.value2float(key, value)
             else:
                 # Set new value for this feature
-                state.join(key,self.value2float(key,value))
-        elif isinstance(state,VectorDistribution):
-            state.join(key,self.value2float(key,value))
+                state.join(key, self.value2float(key, value))
+        elif isinstance(state, VectorDistribution):
+            state.join(key, self.value2float(key, value))
         else:
-            assert not isinstance(value,Distribution)
-            state[key] = self.value2float(key,value)
+            assert not isinstance(value, Distribution)
+            state[key] = self.value2float(key, value)
         if recurse:
             for name, models in self.get_current_models(state).items():
+                inconsistent = []
                 for model in models:
                     beliefs = self.agents[name].models[model].get('beliefs', True)
                     if beliefs is not True and key in beliefs:
-                        self.setFeature(key, value, beliefs, noclobber)
+                        if noclobber:
+                            try:
+                                self.setFeature(key, value, beliefs, noclobber)
+                            except ValueError:
+                                # This model cannot believe this value to be possible
+                                inconsistent.append(model)
+                        else:
+                            self.setFeature(key, value, beliefs, noclobber)
+                if inconsistent:
+                    state.delete_value(modelKey(name), set(inconsistent))
 
     def setJoint(self,distribution,state=None):
         """
@@ -1091,15 +1105,15 @@ class World(object):
         if state is None:
             state = self.state
         assert key in self.variables or makePresent(key) in self.variables,'Unknown element "%s"' % (key)
-        if isinstance(state,KeyedVector):
+        if isinstance(state, KeyedVector):
             return self.float2value(key,state[key])
         else:
             marginal = state.marginal(key)
             if unique:
-                assert len(marginal) == 1,'Unique value requested for %s, but number of values is %d' % (key, len(marginal))
-                return self.float2value(key,marginal).first()
+                assert len(marginal) == 1, 'Unique value requested for %s, but number of values is %d' % (key, len(marginal))
+                return self.float2value(key, marginal).first()
             else:
-                return self.float2value(key,marginal)
+                return self.float2value(key, marginal)
 
     def getValue(self,key,state=None):
         """
