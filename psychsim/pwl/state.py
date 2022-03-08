@@ -4,16 +4,14 @@ import heapq
 import itertools
 import logging
 import math
-import operator
-from xml.dom.minidom import Document,Node
 
 from psychsim.probability import Distribution
 from . import keys
 
-from psychsim.pwl.vector import KeyedVector,VectorDistribution
+from psychsim.pwl.vector import KeyedVector, VectorDistribution
 from psychsim.pwl.matrix import KeyedMatrix
-from psychsim.pwl.plane import KeyedPlane
 from psychsim.pwl.tree import KeyedTree
+
 
 class VectorDistributionSet:
     """
@@ -32,7 +30,7 @@ class VectorDistributionSet:
             self.distributions[0] = node
             self.keyMap = {k: 0 for k in node.keys()}
         elif node is not None:
-            raise TypeError('Unknown argument type for constructor: {}'.format(type(node).__name__))
+            raise TypeError(f'Unknown argument type for constructor: {node.__class__.__name__}')
 
     def add_distribution(self, dist):
         """
@@ -435,46 +433,59 @@ class VectorDistributionSet:
 
     def prune_size(self, k=1):
         if len(self) > k:
-            count = 1
-            dist_list = [dist for dist in self.distributions.values() if len(dist) > 1]
-            max_list = [dist.max(number=3) for dist in dist_list]
+            # List of substate/distribution pairs for uncertain subdistributions
+            dist_list = [dist_tup for dist_tup in self.distributions.items() if len(dist_tup[1]) > 1]
+            # Most probable element in each subdistribution (along with index)
+            for dist_tup in dist_list:
+                dist_tup[1]._Distribution__items.sort(key=lambda tup: (tup[1], tup[0]), reverse=True)
+            max_list = [dist_tup[1]._Distribution__items[0] for dist_tup in dist_list]
+            # Probability of most probable combination
             max_prob = math.prod([tup[1] for tup in max_list])
-            scale_list = [max_prob/tup[1] for tup in max_list]
-            count = [1 for dist in dist_list]
-            size = 1
-            heap = []
-            for i, dist in enumerate(dist_list):
-                for element, tup in enumerate(dist._Distribution__items):
+            # Worlds added so far
+            worlds = []
+            heapq.heappush(worlds, (max_prob, [0 for max_item in max_list]))
+            for i, dist_tup in enumerate(dist_list):
+                current_worlds = worlds[:]
+                for element, tup in enumerate(dist_tup[1]._Distribution__items[1:]):
+                    # This is not the max item (i.e., it is a viable pruning candidate)
                     obj, prob = tup
-                    if element != max_list[i][2]:
-                        # This is not the max item (i.e., it is a viable pruning candidate)
-                        total_prob = prob*scale_list[i]
-                        # How many more possible worlds will be added if I add this element
-                        size_delta = math.prod([n for j, n in enumerate(count) if i != j])
-                        if size + size_delta <= k:
-                            # Just add it already
-                            heapq.heappush(heap, (total_prob, i, element))
-                            count[i] += 1
-                            size += size_delta
-                        else:
-                            # Can't add this without removing someone else
-                            if total_prob > heap[0][0]:
-                                # Remove smallest element
-                                count[heap[0][1]] -= 1
-                                size -= math.prod([n for j, n in enumerate(count) if heap[0][1] != j])
-                                heapq.heapreplace(heap, (total_prob, i, element))
-                                count[i] += 1
-                                size += size_delta*count[heap[0][1]]/(count[heap[0][1]]+1)
-                        while size > k:
-                            # Maybe we're still too big?
-                            count[heap[0][1]] -= 1
-                            size -= math.prod([n for j, n in enumerate(count) if heap[0][1] != j])
-                            heapq.heappop(heap)
-            items = [[tup[2]] for tup in max_list]
-            for prob, dist_index, element in heap:
-                items[dist_index].append(element)
-            for i, dist in enumerate(dist_list):
-                dist._Distribution__items = [dist._Distribution__items[element] for element in items[i]]
+                    change = False
+                    for other_prob, other_world in current_worlds:
+                        if other_world[i] != element+1:
+                            # What if we insert this element to this currently max-k world?
+                            new_prob = other_prob*prob/dist_tup[1]._Distribution__items[other_world[i]][1]
+                            if len(worlds) < k:
+                                # Come on in, there's plenty of room
+                                new_world = other_world[:]
+                                new_world[i] = element+1
+                                heapq.heappush(worlds, (new_prob, new_world))
+                                change = True
+                            elif new_prob > worlds[0][0]:
+                                # This new world is better than the least likely world currently active
+                                new_world = other_world[:]
+                                new_world[i] = element+1
+                                heapq.heapreplace(worlds, (new_prob, new_world))
+                                change = True
+                    if not change:
+                        # Worlds only going to get less likely from here
+                        break
+            target = dist_list[0][0]
+            for sub, dist in dist_list[1:]:
+                del self.distributions[sub]
+            first = True
+            items = []
+            for prob, world in worlds:
+                for i, element in enumerate(world):
+                    if i == 0:
+                        vector = dist_list[i][1]._Distribution__items[element][0]
+                        vector = vector.__class__(vector)
+                    else:
+                        vector.update(dist_list[i][1]._Distribution__items[element][0])
+                if first:
+                    for key in vector.keys():
+                        self.keyMap[key] = target
+                items.append((vector, prob))
+            self.distributions[target]._Distribution__items = items
         return self.probability()
             
     def update(self,other,keySet,scale=1):
@@ -927,10 +938,14 @@ class VectorDistributionSet:
 
     def delete_value(self, key, value):
         """Removes the given value for the given key from the state and then renormalizes
+        :param value: value (or set of values) to be removed
         """
         distribution = self.distributions[self.keyMap[key]]
         for vector in distribution.domain():
-            if vector[key] == value:
+            if isinstance(value, set):
+                if vector[key] in value:
+                    del distribution[vector]
+            elif vector[key] == value:
                 del distribution[vector]
         distribution.normalize()
 
