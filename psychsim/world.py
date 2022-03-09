@@ -156,8 +156,6 @@ class World(object):
         state, policies, choices = self.deltaAction(state, actions, horizon,
                                                     tiebreak, keySubset, debug,
                                                     context)
-        if select:
-            raise RuntimeError
         # Compute the effect of the chosen actions
         effect = self.deltaState(choices,state,keySubset)
         # Update turn order
