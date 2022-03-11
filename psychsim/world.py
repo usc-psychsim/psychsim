@@ -112,7 +112,7 @@ class World(object):
                 del variable['xpost']
                 del variable['ypost']
 
-    def setParallel(self,flag=True):
+    def setParallel(self, flag=True):
         """
         Turns on multiprocessing when agents have turns in parallel
         :param flag: multiprocessing is on iff C{True} (default is C{True})
@@ -212,14 +212,13 @@ class World(object):
                         # Translate any pre-specified actions into PWL policy
                         if isinstance(actions[name], Action):
                             actions[name] = ActionSet([actions[name]])
-                        if isinstance(actions[name],ActionSet):
+                        if isinstance(actions[name], ActionSet):
                             choices[name] = [actions[name]]
                             policies[name] = makeTree(setToConstantMatrix(action,actions[name])).desymbolize(self.symbols)
                         else:
                             policies[name] = actions[name]
                             choices[name] = {m[makeFuture(action)][CONSTANT] for m in policies[name].leaves()}
                     else:
-                        agent = self.agents[name]
                         decision = self.agents[name].decide(state, horizon, actions, None, tiebreak, None, debug=debug.get(name, {}), context=context)
                         if name in debug:
                             debug[name]['__decision__'] = decision
@@ -250,13 +249,9 @@ class World(object):
                 keySet = [k for k in keySet if k in state]
             if len(keySet) > 0:
                 keyOrder.append(keySet)
-#        if TERMINATED in state:
-#            keyOrder.append({TERMINATED})
-        count = 0
         effects = []
         for keySet in keyOrder:
             dynamics = self.getActionEffects(actions,keySet)
-#            dynamics = {}
             for key in keySet:
                 if key not in dynamics:
                     dynamics[key] = None
