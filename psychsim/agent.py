@@ -18,6 +18,7 @@ from psychsim.probability import Distribution
 
 NUM_TO_WORD = ['zero', 'one', 'two', 'three', 'four', 'five']
 
+
 class Agent(object):
     """
     :ivar name: agent name
@@ -194,33 +195,33 @@ class Agent(object):
             state = self.world.state
         if model is None:
             try:
-                model = self.world.getModel(self.name,state)
+                model = self.world.getModel(self.name, state)
             except KeyError:
                 # Use real model as fallback?
                 model = self.world.getModel(self.name)
-        if isinstance(model,Distribution):
+        if isinstance(model, Distribution):
             result = {}
             tree = None
-            myAction = keys.stateKey(self.name,keys.ACTION)
+            myAction = keys.stateKey(self.name, keys.ACTION)
             myModel = keys.modelKey(self.name)
             model_list = list(model.domain())
             tree = {'if': equalRow(myModel, model_list)}
             for index, submodel in enumerate(model_list):
-                result[submodel] = self.decide(state,horizon,others,submodel,
-                                               selection,actions,keySet, debug, context)
+                result[submodel] = self.decide(state, horizon, others, submodel,
+                                               selection, actions, keySet, debug, context)
                 try:
                     matrix = result[submodel]['policy']
                 except KeyError:
-                    if isinstance(result[submodel]['action'],Distribution):
+                    if isinstance(result[submodel]['action'], Distribution):
                         if len(result[submodel]['action']) > 1:
-                            matrix = {'distribution': [(setToConstantMatrix(myAction,el),
+                            matrix = {'distribution': [(setToConstantMatrix(myAction, el),
                                                         result[submodel]['action'][el]) \
                                                        for el in result[submodel]['action'].domain()]}
                         else:
                             # Distribution with 100% certainty
-                            matrix = setToConstantMatrix(myAction,result[submodel]['action'].first())
+                            matrix = setToConstantMatrix(myAction, result[submodel]['action'].first())
                     else:
-                        matrix = setToConstantMatrix(myAction,result[submodel]['action'])
+                        matrix = setToConstantMatrix(myAction, result[submodel]['action'])
                 tree[index] = matrix
             if len(model_list) == 1:
                 # Only one possible model, let's not branch
@@ -236,22 +237,22 @@ class Agent(object):
             # Consider all legal actions (legality determined by my belief, circumscribed by real world)
             actions = self.getLegalActions(belief)
         # Do I have a policy telling me what to do?
-        policy = self.getAttribute('policy',model)
+        policy = self.getAttribute('policy', model)
         if policy:
             action = policy[belief]
             if isinstance(action, Distribution):
                 valid_prob = sum([action[a] for a in action.domain() if a in actions])
                 elements = [(a, action[a]/valid_prob) for a in action.domain() if a in actions]
                 result = {'policy': makeTree({'distribution': [(setToConstantMatrix(actionKey(self.name), a), prob) for a, prob in elements]}),
-                    'action': Distribution({a:prob for a, prob in elements})}
+                          'action': Distribution({a:prob for a, prob in elements})}
             else:
                 result = {'policy': makeTree(setToConstantMatrix(actionKey(self.name), action)),
-                    'action': Distribution({action: 1})}
+                          'action': Distribution({action: 1})}
             return result
         if horizon is None:
-            horizon = self.getAttribute('horizon',model)
+            horizon = self.getAttribute('horizon', model)
         else:
-            horizon = min(horizon,self.getAttribute('horizon',model))
+            horizon = min(horizon, self.getAttribute('horizon',model))
         if len(actions) == 0:
             # Someone made a boo-boo because there is no legal action for this agent right now
             buf = StringIO()
@@ -1251,7 +1252,7 @@ class Agent(object):
             return {element: self.getBelief(vector,element) \
                     for element in model.domain()}
         else:
-            beliefs = self.getAttribute('beliefs',model)
+            beliefs = self.getAttribute('beliefs', model)
             if beliefs.__class__ is dict:
                 logging.warning('%s has extraneous layer of nesting in beliefs' % (self.name))
                 beliefs = beliefs[model]
