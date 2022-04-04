@@ -38,7 +38,10 @@ class PsychSimUI(QMainWindow, Ui_MainWindow):
 #                    msg.exec_()
 #                    return
         else:
-            self.world = World(filename)
+            try:
+                self.world = World(filename)
+            except FileNotFoundError:
+                return None
         self.scene.world = self.world
         self.scene.clear()
         settings.setValue('LastFile',os.path.abspath(filename))
