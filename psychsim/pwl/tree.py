@@ -739,7 +739,7 @@ class KeyedTree:
         else:
             self.makeLeaf(children[None])
 
-def makeTree(table):
+def makeTree(table, normalize=True):
     if isinstance(table,bool):
         # Boolean leaf
         return KeyedTree(table)
@@ -759,7 +759,7 @@ def makeTree(table):
     elif 'if' in table:
         # Binary deterministic branch
         tree = KeyedTree()
-        children = {key: makeTree(table[key]) for key in table if key != 'if'}
+        children = {key: makeTree(table[key], normalize) for key in table if key != 'if'}
         if not table['if'].isConjunction and len(table['if'].planes) == 2:
             if table['if'].planes[0][0] == table['if'].planes[1][0] and table['if'].planes[0][1] == table['if'].planes[1][1] and table['if'].planes[0][2] == -table['if'].planes[1][2]:
                 # Not equal branch, let's just compact it into a single equal branch
@@ -781,14 +781,17 @@ def makeTree(table):
         tree['if'] = equalRow(table['case'], keys)
         for index, key in enumerate(keys):
             tree[index] = table[key]
-        return makeTree(tree)
+        return makeTree(tree, normalize)
     elif 'distribution'in table:
         # Probabilistic branch
         tree = KeyedTree()
         branch = {}
-        for subtable,prob in table['distribution']:
-            branch[makeTree(subtable)] = prob
-        tree.makeProbabilistic(Distribution(branch))
+        for subtable, prob in table['distribution']:
+            branch[makeTree(subtable, normalize)] = prob
+        dist = Distribution(branch)
+        if normalize:
+            dist.normalize()
+        tree.makeProbabilistic(dist)
         return tree
     else:
         # Leaf
