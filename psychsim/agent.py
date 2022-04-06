@@ -773,44 +773,43 @@ class Agent(object):
     """Reward methods"""
     """------------------"""
 
-    def setReward(self,tree,weight=0.,model=None):
+    def setReward(self, tree, weight=0, model=None):
         """
         Adds/updates a goal weight within the reward function for the specified model.
         """
         if model is None:
-            for model in self.world.getModel(self.name,self.world.state).domain():
-                self.setReward(tree,weight,model)
+            for model in self.world.getModel(self.name, self.world.state).domain():
+                self.setReward(tree, weight, model)
         else:
-            if self.models[model].get('R',None) is None:
+            if self.models[model].get('R', None) is None:
                 self.models[model]['R'] = {}
-            if not isinstance(tree,str):
+            if not isinstance(tree, str):
                 tree = tree.desymbolize(self.world.symbols)
             self.models[model]['R'][tree] = weight
             key = rewardKey(self.name)
-            if not key in self.world.variables:
-                self.world.defineVariable(key,float,
+            if key not in self.world.variables:
+                self.world.defineVariable(key, float,
                                           description='Reward for %s in this state' % (self.name))
-                self.world.setFeature(key,0.)
+                self.world.setFeature(key, 0)
+            self.setAttribute('R tree', None)
 
-    def getReward(self,model=None):
+    def getReward(self, model=None):
         if model is None:
-            model = self.world.getModel(self.name,self.world.state)
-            if isinstance(model,Distribution):
+            model = self.world.getModel(self.name, self.world.state)
+            if isinstance(model, Distribution):
                 return {m: self.getReward(m) for m in model.domain()}
             else:
                 return {model: self.getReward(model)}
-        R = self.getAttribute('R',model)
+        R = self.getAttribute('R tree', model)
         if R is None:
-            # No reward components
-#            R = KeyedTree(setToConstantMatrix(rewardKey(self.name),0.))
-#            self.setAttribute('R',R,model)
-            return R
-        elif isinstance(R,dict):
+            R = self.getAttribute('R', model)
+            if R is None:
+                R = {}
             Rsum = None
-            for tree,weight in R.items():
-                if isinstance(tree,str):
+            for tree, weight in R.items():
+                if isinstance(tree, str):
                     agent = self.world.agents[tree]
-                    dist = self.world.getModel(agent.name,self.getBelief(model=model))
+                    dist = self.world.getModel(agent.name, self.getBelief(model=model))
                     if len(dist) == 1:
                         otherModel = dist.first()
                         tree = agent.getReward(otherModel)
@@ -821,8 +820,8 @@ class Agent(object):
                 else:
                     Rsum += weight*tree
             if Rsum is None:
-                Rsum = KeyedTree(setToConstantMatrix(rewardKey(self.name),0.))
-            self.setAttribute('R',Rsum,model)
+                Rsum = KeyedTree(setToConstantMatrix(rewardKey(self.name), 0))
+            self.setAttribute('R tree', Rsum, model)
             return Rsum
         else:
             return R
