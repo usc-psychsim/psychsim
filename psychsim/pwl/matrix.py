@@ -1,9 +1,8 @@
 import copy
 
-from psychsim.probability import Distribution
-
-from psychsim.pwl.vector import *
+from psychsim.pwl.vector import KeyedVector, VectorDistribution
 from psychsim.pwl.keys import CONSTANT, makeFuture
+
 
 class KeyedMatrix:
     """
@@ -23,11 +22,11 @@ class KeyedMatrix:
     def items(self):
         return iter(self.__rows)
 
-    def __deepcopy__(self,memo):
+    def __deepcopy__(self, memo):
         result = self.__class__(copy.deepcopy(self.__rows, memo))
-        result.__keys_in = None #self.__keys_in
-        result.__keys_out = None #self.__keys_out
-        result.__string = None #self.__string
+        result.__keys_in = None  # self.__keys_in
+        result.__keys_out = None  # self.__keys_out
+        result.__string = None  # self.__string
         return result
 
     def __len__(self):
@@ -73,7 +72,7 @@ class KeyedMatrix:
         while my_index < len(self):
             my_key, my_vector = self.__rows[my_index]
             if yr_index < len(other):
-                yr_key, yr_vector = self.__rows[yr_index]
+                yr_key, yr_vector = other.__rows[yr_index]
                 if my_key == yr_key:
                     items.append((my_key, my_vector+yr_vector))
                     my_index += 1
@@ -90,11 +89,11 @@ class KeyedMatrix:
                 my_index += 1
         # No more rows in me
         while yr_index < len(other):
-            items.append(self.__rows[yr_index])
+            items.append(other.__rows[yr_index])
             yr_index += 1
         return KeyedMatrix(items)
 
-    def __sub__(self,other):
+    def __sub__(self, other):
         return self + (-other)
 
     def multiply_matrix(self, other):
@@ -108,7 +107,7 @@ class KeyedMatrix:
                     col = other[c1].items()
                 except KeyError:
                     if c1 == CONSTANT:
-                        col = [(CONSTANT,1)]
+                        col = [(CONSTANT, 1)]
                     else:
                         continue
                 for c2, value2 in col:
@@ -226,9 +225,9 @@ class KeyedMatrix:
         for row, vector in self.items():
             if row in table:
                 result[row] = KeyedVector()
-                lo,hi = table[row]
+                lo, hi = table[row]
                 constant = 0
-                for col,value in items():
+                for col, value in table.items():
                     if col == row:
                         # Same value
                         result[row][col] = value
@@ -236,14 +235,14 @@ class KeyedMatrix:
                     elif col != CONSTANT:
                         # Scale weight for another feature
                         if abs(value) > epsilon:
-                            assert col in table,'Unable to mix symbolic and numeric values in single vector'
-                            colLo,colHi = table[col]
+                            assert col in table, 'Unable to mix symbolic and numeric values in single vector'
+                            colLo, colHi = table[col]
                             result[row][col] = value*(colHi-colLo)*(hi-lo)
                             constant += value*colLo
                 result[row][CONSTANT] = constant - lo
                 if CONSTANT in vector:
                     result[row][CONSTANT] += vector[CONSTANT]
-                result[row][CONSTANT] /- (hi-lo)
+                result[row][CONSTANT] /= (hi-lo)
             else:
                 result[row] = KeyedVector(vector)
         return result
@@ -258,7 +257,7 @@ class KeyedMatrix:
         raise KeyError(f'Matrix missing row for {key}')
 
     def __setitem__(self, key, value):
-        assert isinstance(value,KeyedVector),'Illegal row type: %s' % \
+        assert isinstance(value, KeyedVector), 'Illegal row type: %s' % \
             (value.__class__.__name__)
         for index, item in enumerate(self.__rows):
             if item[0] == key:
@@ -288,7 +287,7 @@ class KeyedMatrix:
                 elif my_key < yr_key:
                     my_index += 1
                     break
-                else: # my_key > yr_key
+                else:  # my_key > yr_key
                     self.__rows.insert(my_index, (yr_key, yr_vector))
                     yr_index += 1
             else:
@@ -303,31 +302,40 @@ class KeyedMatrix:
     def __hash__(self):
         return hash(tuple(self.items()))
 
-def dynamicsMatrix(key,vector):
+
+def dynamicsMatrix(key, vector):
     """
     :returns: a dynamics matrix setting the given key to be equal to the given weighted sum
     :rtype: L{KeyedMatrix}
     """
     return KeyedMatrix({makeFuture(key): KeyedVector(vector)})
-def scaleMatrix(key,weight):
+
+
+def scaleMatrix(key, weight):
     """
     :returns: a dynamics matrix modifying the given keyed value by scaling it by the given weight
     :rtype: L{KeyedMatrix}
     """
     return KeyedMatrix({makeFuture(key): KeyedVector({key: weight})})
+
+
 def noChangeMatrix(key):
     """
     :returns: a dynamics matrix indicating no change to the given keyed value
     :rtype: L{KeyedMatrix}
     """
-    return scaleMatrix(key,1)
+    return scaleMatrix(key, 1)
+
+
 def nullMatrix(key):
     """
     :returns: a fake dynamics matrix that doesn't change time
     :rtype: L{KeyedMatrix}
     """
     return KeyedMatrix({key: KeyedVector({key: 1})})
-def approachMatrix(key,weight,limit,limitKey=CONSTANT):
+
+
+def approachMatrix(key, weight, limit, limitKey=CONSTANT):
     """
     :param weight: the percentage by which you want the feature to approach the limit
     :type weight: float
@@ -340,36 +348,48 @@ def approachMatrix(key,weight,limit,limitKey=CONSTANT):
     """
     return KeyedMatrix({makeFuture(key): KeyedVector({key: 1-weight,
                                                       limitKey: weight*limit})})
-def incrementMatrix(key,delta):
+
+
+def incrementMatrix(key, delta):
     """
     :param delta: the constant value to add to the state feature
     :type delta: float
     :returns: a dynamics matrix incrementing the given keyed value by the constant delta
     :rtype: L{KeyedMatrix}
     """
-    return KeyedMatrix({makeFuture(key): KeyedVector({key: 1,CONSTANT: delta})})
-def setToConstantMatrix(key,value):
+    return KeyedMatrix({makeFuture(key): KeyedVector({key: 1, CONSTANT: delta})})
+
+
+def setToConstantMatrix(key, value):
     """
     :type value: float
     :returns: a dynamics matrix setting the given keyed value to the constant value
     :rtype: L{KeyedMatrix}
     """
     return KeyedMatrix({makeFuture(key): KeyedVector({CONSTANT: value})})
-def setToFeatureMatrix(key,otherKey,pct=1,shift=0):
+
+
+def setToFeatureMatrix(key, otherKey, pct=1, shift=0):
     """
     :type otherKey: str
     :returns: a dynamics matrix setting the given keyed value to a percentage of another keyed value plus a constant shift (default is 100% with shift of 0)
     :rtype: L{KeyedMatrix}
     """
     return KeyedMatrix({makeFuture(key): KeyedVector({otherKey: pct,CONSTANT: shift})})
-def addFeatureMatrix(key,otherKey,pct=1):
+
+
+def addFeatureMatrix(key, otherKey, pct=1):
     """
     :type otherKey: str
     :returns: a dynamics matrix adding a percentage of another feature value to the given feature value (default percentage is 100%)
     :rtype: L{KeyedMatrix}
     """
-    return KeyedMatrix({makeFuture(key): KeyedVector({key: 1,otherKey: pct})})
+    return KeyedMatrix({makeFuture(key): KeyedVector({key: 1, otherKey: pct})})
+
+
 def setTrueMatrix(key):
-    return setToConstantMatrix(key,1)
+    return setToConstantMatrix(key, 1)
+
+
 def setFalseMatrix(key):
-    return setToConstantMatrix(key,0)
+    return setToConstantMatrix(key, 0)
