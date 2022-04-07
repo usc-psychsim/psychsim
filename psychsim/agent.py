@@ -642,7 +642,7 @@ class Agent(object):
     """Action methods"""
     """------------------"""
 
-    def addAction(self,action,condition=None,description=None,codePtr=False):
+    def addAction(self, action, condition=None, description=None, codePtr=False):
         """
         :param condition: optional legality condition
         :type condition: L{KeyedPlane}
@@ -650,30 +650,28 @@ class Agent(object):
         :rtype: L{ActionSet}
         """
         actions = []
-        if isinstance(action,set) or isinstance(action,frozenset) or isinstance(action,list):
+        if isinstance(action, set) or isinstance(action, frozenset) or isinstance(action, list):
             for atom in action:
-                if isinstance(atom,Action):
+                if isinstance(atom, Action):
                     actions.append(Action(atom))
                 else:
                     actions.append(atom)
-        elif isinstance(action,Action):
+        elif isinstance(action, Action):
             actions.append(action)
         else:
-            assert isinstance(action,dict),'Argument to addAction must be at least a dictionary'
+            assert isinstance(action, dict), 'Argument to addAction must be at least a dictionary'
             actions.append(Action(action,description))
         for atom in actions:
-            if not 'subject' in  atom:
+            if 'subject' not in atom:
                 # Make me the subject of these actions
                 atom['subject'] = self.name
         new = ActionSet(actions)
         assert new not in self.actions,'Action %s already defined' % (new)
         self.actions.add(new)
         if condition:
-            self.legal[new] = condition.desymbolize(self.world.symbols)
+            self.setLegal(new, condition)
         if codePtr:
             if codePtr is True:
-                import inspect
-
                 for frame in inspect.getouterframes(inspect.currentframe()):
                     try:
                         fname = frame.filename
@@ -684,11 +682,11 @@ class Agent(object):
             else:
                 frame = codePtr
             mod = os.path.relpath(frame.filename,
-                                  os.path.abspath(os.path.join(os.path.dirname(__file__),'..')))
+                                  os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
             try:
-                self.world.extras[new] = '%s:%d' % (mod,frame.lineno)
+                self.world.extras[new] = '%s:%d' % (mod, frame.lineno)
             except AttributeError:
-                self.world.extras[new] = '%s:%d' % (mod,frame[2])
+                self.world.extras[new] = '%s:%d' % (mod, frame[2])
         # Add to state vector
         key = actionKey(self.name)
         if key in self.world.variables:
@@ -696,8 +694,8 @@ class Agent(object):
             self.world.symbolList.append(new)
             self.world.variables[key]['elements'].add(new)
         else:
-            self.world.defineVariable(key,ActionSet,description='Action performed by %s' % (self.name))
-            self.world.setFeature(key,new)
+            self.world.defineVariable(key, ActionSet,description='Action performed by %s' % (self.name))
+            self.world.setFeature(key, new)
         self.world.dynamics[new] = {}
         return new
 
@@ -733,7 +731,7 @@ class Agent(object):
                 result.add(action)
         return result
 
-    def setLegal(self,action,tree):
+    def setLegal(self, action, tree):
         """
         Sets the legality decision tree for a given action
         :param action: the action whose legality we are setting
@@ -742,17 +740,21 @@ class Agent(object):
         """
         self.legal[action] = tree.desymbolize(self.world.symbols)
 
-    def hasAction(self,atom):
+    def hasAction(self, atom):
         """
-        :type atom: L{Action}
-        
-    :returns: ``True`` iff this agent has the given action (possibly in combination with other actions)
+        :type atom: L{Action} or dict
+        :returns: ``True`` iff this agent has the given action (possibly in combination with other actions)
         :rtype: bool
         """
         for action in self.actions:
             for candidate in action:
-                if atom.root() == candidate.root():
-                    return True
+                if isinstance(atom, Action):
+                    if atom.root() == candidate.root():
+                        return True
+                else:
+                    # Match against dictionary pattern
+                    if atom == {key: candidate[key] for key in atom}:
+                        return True
         else:
             return False
 
@@ -869,22 +871,21 @@ class Agent(object):
             total = float(vector[rewardKey(self.name)])
         return total
 
-    def printReward(self,model=True,buf=None,prefix=''):
+    def printReward(self, model=True, buf=None, prefix=''):
         first = True
-        R = self.getAttribute('R',model)
-        if isinstance(R,dict):
-            for tree,weight in R.items():
+        R = self.getReward(model)
+        if isinstance(R, dict):
+            for tree, weight in R.items():
                 if first:
-                    msg = '%s\tR\t\t%3.1f %s' % (prefix,weight,str(tree))
-                    print(msg.replace('\n','\n%s\t\t\t' % (prefix)),file=buf)
+                    msg = '%s\tR\t\t%3.1f %s' % (prefix, weight, str(tree))
+                    print(msg.replace('\n', '\n%s\t\t\t' % (prefix)), file=buf)
                     first = False
                 else:
-                    msg = '%s\t\t\t%3.1f %s' % (prefix,weight,str(tree))
-                    print(msg.replace('\n','\n%s\t\t\t' % (prefix)),file=buf)
+                    msg = '%s\t\t\t%3.1f %s' % (prefix, weight, str(tree))
+                    print(msg.replace('\n', '\n%s\t\t\t' % (prefix)), file=buf)
         else:
-            msg = '%s\tR\t\t%s' % (prefix,str(R))
-            print(msg.replace('\n','\n%s\t\t\t' % (prefix)),file=buf)
-
+            msg = '%s\tR\t\t%s' % (prefix, str(R))
+            print(msg.replace('\n', '\n%s\t\t\t' % (prefix)), file=buf)
 
     """------------------"""
     """Mental model methods"""
