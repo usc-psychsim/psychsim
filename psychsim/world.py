@@ -904,13 +904,13 @@ class World(object):
         if domain is float:
             self.variables[key].update({'lo': lo,'hi': hi})
         elif domain is int:
-            self.variables[key].update({'lo': int(lo),'hi': int(hi)})
+            self.variables[key].update({'lo': int(lo),'hi': None if hi is None else int(hi)})
         elif domain is list or domain is set:
             assert isinstance(lo,list) or isinstance(lo,set),\
                 'Please provide set/list of elements for features of the set/list type'
             self.variables[key].update({'elements': lo,'lo': None,'hi': None})
             for element in lo:
-                if not element in self.symbols:
+                if element not in self.symbols:
                     self.symbols[element] = len(self.symbols)
                     self.symbolList.append(element)
         elif domain is bool:
