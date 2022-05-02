@@ -678,7 +678,13 @@ class World(object):
     """Turn order methods"""
     """------------------"""
 
-    def setOrder(self,order):
+    def setOrder(self, order):
+        """
+        Equivalent to the more pythonic set_order
+        """
+        self.set_order(self, order)
+
+    def setOrder(self, order):
         """
         Initializes the turn order to the given order
         :param order: the turn order, as a list of names (each agent acts in sequence) or a list of sets of names (agents within a set acts in parallel)
@@ -686,7 +692,7 @@ class World(object):
         """
         self.maxTurn = len(order) - 1
         for index in range(len(order)):
-            if isinstance(order[index],set):
+            if isinstance(order[index], set):
                 names = order[index]
             else:
                 names = [order[index]]
@@ -694,14 +700,16 @@ class World(object):
                 # Insert turn key
                 key = turnKey(name)
                 self.turnKeys.add(key)
-                if not key in self.variables:
+                if key not in self.variables:
                     self.defineVariable(key, int, hi=self.maxTurn)
-                self.setFeature(key,index)
+                self.setFeature(key, index)
                 # Insert action key
-                key = stateKey(name,keys.ACTION)
-                if not key in self.variables:
-                    self.defineVariable(key,ActionSet,description='Action performed by %s' % (name))
-                    self.setFeature(key,next(iter(self.variables[key]['elements'])))
+                key = stateKey(name, keys.ACTION)
+                if key not in self.variables:
+                    self.defineVariable(key, ActionSet, description='Action performed by %s' % (name))
+                    if len(self.agents[name].actions) == 0:
+                        raise ValueError(f'Agent {name} is included in turn order, but has no actions defined')
+                    self.setFeature(key, next(iter(self.variables[key]['elements'])))
 
     def setAllParallel(self):
         """
