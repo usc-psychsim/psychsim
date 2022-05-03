@@ -180,6 +180,14 @@ class ActionSet(frozenset):
             return self.__getitem__(key)
         except KeyError:
             return default
+
+    def items(self):
+        history = set()
+        for a in self:
+            for key, value in a.items():
+                if key not in history:
+                    yield key, self[key]
+                    history.add(key)
         
     def __str__(self):
         return ','.join(map(str,self))
