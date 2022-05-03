@@ -404,7 +404,7 @@ class World(object):
             self.agents[agent.name] = agent
             agent.world = self
             key = modelKey(agent.name)
-            if not key in self.variables:
+            if key not in self.variables:
                 self.defineVariable(key, list, list(agent.models.keys()), avoid_beliefs=avoid_beliefs)
             
             if len(agent.models) == 0:
