@@ -941,7 +941,7 @@ class Agent(object):
             self.world.variables[modelKey(self.name)]['elements'].append(name)
         return model
 
-    def get_true_model(self,unique=True):
+    def get_true_model(self, unique=True):
         """
         :return: the name of the "true" model of this agent, i.e., the model by which the real agent is governed in the real world
         :rtype: str
