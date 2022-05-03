@@ -249,7 +249,7 @@ def addTree(doc,tree,world,indent=0,prefix=None):
                 addTree(doc,child,world,indent+2,'OTHERWISE ')
         
 
-def addState(doc,world):
+def addState(doc, world, strict=False):
     with doc.create(Section('State')):
         for name,variable in sorted(world.variables.items()):
             if isStateKey(name):
@@ -269,7 +269,7 @@ def addState(doc,world):
                     if name in world.extras:
                         with doc.create(FlushLeft()):
                             doc.append(verbatim(world.extras[name]))
-                    else:
+                    elif strict:
                         raise RuntimeError('Missing code pointer for %s' % (name))
                     if name in world.dynamics:
                         for action,tree in sorted(world.dynamics[name].items()):
@@ -282,11 +282,11 @@ def addState(doc,world):
                                     if '%s %s' % (name,action) in world.extras:
                                         doc.append(verbatim(world.extras[ '%s %s' % (name,action)]))
                                         doc.append(LineBreak())
-                                    else:
+                                    elif strict:
                                         raise RuntimeError
                                     addTree(doc,tree,world)
 
-def addRelations(doc,world):
+def addRelations(doc, world, strict=False):
     with doc.create(Section('Relations')):
         for name,variable in sorted(world.variables.items()):
             if isBinaryKey(name):
@@ -300,7 +300,7 @@ def addRelations(doc,world):
                     if name in world.extras:
                         with doc.create(FlushLeft()):
                             doc.append(verbatim(world.extras[name]))
-                    else:
+                    elif strict:
                         raise RuntimeError('Missing code pointer for %s' % (name))
                     if name in world.dynamics:
                         for action,tree in sorted(world.dynamics[name].items()):
@@ -312,7 +312,8 @@ def addRelations(doc,world):
                                 with doc.create(FlushLeft()):
                                     addTree(doc,tree,world)
     
-def addActions(doc,world):
+
+def addActions(doc, world, strict=False):
     with doc.create(Section('Actions')):
         for name,agent in world.agents.items():
             for action in sorted(agent.actions):
@@ -325,7 +326,7 @@ def addActions(doc,world):
                     if action in world.extras:
                         with doc.create(FlushLeft()):
                             doc.append(verbatim(world.extras[action]))
-                    else:
+                    elif strict:
                         raise RuntimeError('Missing code pointer for %s' % (name))
                     if action in agent.legal:
                         with doc.create(Subsubsection('Applicability of %s' % (label))):
@@ -341,6 +342,7 @@ def addActions(doc,world):
                         with doc.create(Subsubsection('Effect on %s of %s' % (key,label))):
                             with doc.create(FlushLeft()):
                                 addTree(doc,tree,world)
+
 
 def addReward(doc,world):
     with doc.create(Section('Expected Reward')):
@@ -368,7 +370,8 @@ def background(doc):
             itemize.add_item('Links from a state node to an agent\'s utility node specify that the state node is an input to the expected value calculation performed by that agent. There is a real-valued weight from $(0,1]$ on each link specifying the priority of that variable\'s influence on that agent\'s reward calculation (higher values mean higher priority).')
             itemize.add_item('Links from utility nodes to action nodes indicate that the expected value calculation then determines whether or not that action is chosen. In the simulations described here, we use a strict maximization, so that the action choice is deterministic (i.e., the action with the highest expected value is performed, with ties broken by a pre-determined fixed order).')
             itemize.add_item('Therefore, in the above simple ground truth, whether or not ``Actor1\'\' chooses to do ``action\'\' to ``Actor2\'\' influences the subsequent value of the variable ``state\'\' (link from rectangle to oval). The subsequent value of ``state\'\' also depends on its prior value (link from oval to itself). ``Actor1\'\'\'s expected value of doing ``action\'\' to ``Actor2\'\' is a function of the value of ``state\'\' (link from oval to hexagon), and this expected value influences whether or not ``Actor1\'\' chooses to do so (link from hexagon to rectangle).')
-        doc.append('Any real values (e.g., initial values of variables, conditional probability table values, reward weights) will be drawn from either a set {0, 0.5, 1} or {0, 0.2, 0.4, 0.6, 0.8, 1}, depending on the appropriate granularity needed.')
+#        doc.append('Any real values (e.g., initial values of variables, conditional probability table values, reward weights) will be drawn from either a set {0, 0.5, 1} or {0, 0.2, 0.4, 0.6, 0.8, 1}, depending on the appropriate granularity needed.')
+ 
     
 def createDoc(title):
     doc = Document(geometry_options={'tmargin': '1in', 
