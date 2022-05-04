@@ -350,7 +350,9 @@ class VectorDistributionSet:
         if key in self.keyMap:
             assert substate is None, f'Cannot join {key} to distribution {substate} as it already exists in distribution {self.keyMap[key]}'
             substate = self.keyMap[key]
-            if substate is not None:
+            if substate is None:
+                del self.certain[key]
+            else:
                 self.distributions[substate].delete_column(key)
         if substate is None:
             if isinstance(value, Distribution):
