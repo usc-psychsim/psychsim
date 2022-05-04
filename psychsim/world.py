@@ -682,9 +682,9 @@ class World(object):
         """
         Equivalent to the more pythonic set_order
         """
-        self.set_order(self, order)
+        self.set_order(order)
 
-    def setOrder(self, order):
+    def set_order(self, order):
         """
         Initializes the turn order to the given order
         :param order: the turn order, as a list of names (each agent acts in sequence) or a list of sets of names (agents within a set acts in parallel)
