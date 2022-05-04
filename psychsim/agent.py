@@ -753,7 +753,7 @@ class Agent(object):
                         return True
                 else:
                     # Match against dictionary pattern
-                    if atom == {key: candidate[key] for key in atom}:
+                    if atom == {key: candidate.get(key, None) for key in atom}:
                         return True
         else:
             return False
