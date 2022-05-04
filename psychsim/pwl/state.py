@@ -626,6 +626,8 @@ class VectorDistributionSet:
                             substate = self.keyMap[colKey]
                             if substate == destination:
                                 value = state[colKey]
+                            elif substate is None:
+                                value = self.certain[colKey]
                             else:
                                 # Certainty
                                 value = self.distributions[substate].first()[colKey]
