@@ -126,7 +126,7 @@ class World(object):
                 
     def step(self, actions=None, state=None, real=True, select=False, 
              keySubset=None, horizon=None, tiebreak=None, updateBeliefs=True,
-             debug={}, threshold=None, context=''):
+             debug={}, threshold=None, context='', max_k=None):
         """
         The simulation method
         :param actions: optional argument setting a subset of actions to be 
@@ -161,7 +161,7 @@ class World(object):
         # Update turn order
         effect.append(self.deltaTurn(state, policies))
         for stage in effect:
-            state = self.applyEffect(state, stage, select)
+            state = self.applyEffect(state, stage, select, max_k=max_k)
             state.make_certain()
         # The future becomes the present
         state.rollback()
@@ -272,7 +272,7 @@ class World(object):
             dynamics.update(self.getTurnDynamics(key,actions))
         return dynamics
 
-    def applyEffect(self,state,effect,select=False):
+    def applyEffect(self,state,effect,select=False, max_k=None):
         if isinstance(select,dict):
             default_select = select.get('__default__',True)
         else:
@@ -337,6 +337,8 @@ class World(object):
                                 ', '.join(['"%s"' % (self.float2value(key,el)) 
                                     for el in state.marginal(makeFuture(key)).domain()])))
                     state[makeFuture(key)] = select[key]
+                if max_k is not None:
+                    state.prune_size(max_k)
         return state
 
     def addTermination(self,tree,action=True):
