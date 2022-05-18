@@ -708,7 +708,7 @@ class VectorDistributionSet:
                     s *= plane[0]
                     should_copy = False
                     valSub = s.keyMap[keys.VALUE]
-                    if s_tuple[1] < 1:
+                    if s_tuple[1] < 1 and not math.isclose(s_tuple[1], 1, rel_tol=1e-8):
                         # We've already descended along one side of a branch
                         partials = [substate for substate, dist in self.distributions.items() if not dist.is_complete()]
                         if len(partials) > 1:
