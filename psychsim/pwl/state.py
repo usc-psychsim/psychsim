@@ -17,20 +17,20 @@ class VectorDistributionSet:
     """
     Represents a distribution over independent state vectors, i.e., independent L{VectorDistribution}s
     """
-    def __init__(self,node=None):
+    def __init__(self, start=None):
         self.distributions = {}
         self.certain = {}
         self.keyMap = {}
-        if isinstance(node,dict):
+        if isinstance(start, dict):
             substate = 0
-            for key,value in node.items():
-                self.join(key,value,substate)
+            for key, value in start.items():
+                self.join(key, value, substate)
                 substate += 1
-        elif isinstance(node,VectorDistribution):
-            self.distributions[0] = node
-            self.keyMap = {k: 0 for k in node.keys()}
-        elif node is not None:
-            raise TypeError(f'Unknown argument type for constructor: {node.__class__.__name__}')
+        elif isinstance(start, VectorDistribution):
+            self.distributions[0] = start
+            self.keyMap = {k: 0 for k in start.keys()}
+        elif start is not None:
+            raise TypeError(f'Unknown argument type for initial value: {start.__class__.__name__}')
 
     def add_distribution(self, dist):
         """
@@ -114,7 +114,7 @@ class VectorDistributionSet:
         substate = self.keyMap[key]
         if substate is None:
             if self.certain[key] != value:
-                raise ValueError('P({}={}) = 0 because {}={}'.format(key, value, key, self.certain[key]))
+                raise ValueError(f'P({key}={value}) = 0 because {key}={self.certain[key]}')
         else:
             dist = self.distributions[substate]
             items = dist._Distribution__items
@@ -310,7 +310,7 @@ class VectorDistributionSet:
                 prob *= distribution.select(maximize,incremental)
         return prob
 
-    def substate(self,obj,ignoreCertain=False):
+    def substate(self, obj, ignoreCertain=False):
         """
         :return: the substate referred to by all of the keys in the given object
         """
@@ -322,7 +322,7 @@ class VectorDistributionSet:
         else:
             return {self.keyMap[k] for k in obj if k != keys.CONSTANT}
 
-    def merge(self,substates):
+    def merge(self, substates):
         """
         :return: the substate into which they've all been merged
         """
@@ -372,7 +372,7 @@ class VectorDistributionSet:
                 self.distributions[substate] = VectorDistribution([(KeyedVector({keys.CONSTANT:1}), 1)])
             self.distributions[substate].join(key, value)
 
-    def marginal(self,key):
+    def marginal(self, key):
         substate = self.keyMap[key]
         if substate is None:
             return Distribution({self.certain[key]: 1})
@@ -380,13 +380,13 @@ class VectorDistributionSet:
             return self.distributions[substate].marginal(key)
 
     def domain(self, key):
-        if isinstance(key,str):
+        if isinstance(key, str):
             substate = self.keyMap[key]
             if substate is None:
                 return [self.certain[key]]
             else:
                 return {v[key] for v in self.distributions[substate].domain()}
-        elif isinstance(key,list):
+        elif isinstance(key, list):
             # Identify the relevant subdistributions
             substates = OrderedDict()
             for subkey in key:
@@ -708,7 +708,7 @@ class VectorDistributionSet:
                     s *= plane[0]
                     should_copy = False
                     valSub = s.keyMap[keys.VALUE]
-                    if s_tuple[1] < 1 and not math.isclose(s_tuple[1], 1, rel_tol=1e-8):
+                    if not math.isclose(s_tuple[1], 1, rel_tol=1e-8):
                         # We've already descended along one side of a branch
                         partials = [substate for substate, dist in self.distributions.items() if not dist.is_complete()]
                         if len(partials) > 1:

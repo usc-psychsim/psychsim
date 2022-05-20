@@ -182,7 +182,7 @@ class Distribution:
         """
         :return: True iff the total probability mass is 1 (or within epsilon of 1)
         """
-        return abs(self.probability()-1) < self.epsilon if epsilon is None else epsilon
+        return math.isclose(self.probability(), 1, rel_tol=self.epsilon if epsilon is None else epsilon)
         
     def __float__(self):
         return self.expectation()
