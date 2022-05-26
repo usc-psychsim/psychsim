@@ -1,6 +1,7 @@
 import heapq
 import math
 import random
+from typing import Any
 
 
 class Distribution:
@@ -187,11 +188,11 @@ class Distribution:
     def __float__(self):
         return self.expectation()
 
-    def sample(self):
+    def sample(self) -> tuple[Any, float]:
         """
         :returns: an element from this domain, with a sample probability given by this distribution
         """
-        return random.choices([item[0] for item in self.__items], [item[1] for item in self.__items])[0]
+        return random.choices([item[0] for item in self.__items], [item[1] for item in self.__items])
 
     def set(self, element):
         """
@@ -208,9 +209,9 @@ class Distribution:
         """
         if maximize:
             element = self.max()
+            prob = self[element]
         else:
-            element = self.sample()
-        prob = self[element]
+            element, prob = self.sample()
         self.set(element)
         return prob
 
