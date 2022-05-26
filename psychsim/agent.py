@@ -167,8 +167,9 @@ class Agent(object):
                         print(mentalModel['policy'])
         return model['V'][horizon]
                             
-    def decide(self,state=None,horizon=None,others=None,model=None,selection=None,actions=None,
-               keySet=None,debug={}, context=''):
+    def decide(self, state=None, horizon=None, others=None, model=None,
+               selection=None, actions=None, keySet=None, debug={}, 
+               context=''):
         """
         Generate an action choice for this agent in the given state
 
@@ -1513,7 +1514,9 @@ class Agent(object):
                             self.world.setFeature(oldModelKey, newModel, beliefs)
                             assert self.world.getFeature(oldModelKey, beliefs, True) == newModel
                         else:
-                            raise RuntimeError
+                            raise ValueError(f'"modelKey(\'{self.name}\')" should be in "omega" for {self.name}. '
+                                             f'If you really do not want {self.name} to know its own model, '
+                                             f'please discuss with management.')
                         assert self.world.getFeature(oldModelKey, beliefs, True) == newModel
                         logging.debug('{} SE({}, {})={}'.format(context, myAction, horizon, newModel))
             # Insert new model into true state
