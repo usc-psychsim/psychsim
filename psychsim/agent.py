@@ -6,7 +6,6 @@ import math
 import multiprocessing
 import os
 import random
-from typing import Dict
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -760,7 +759,7 @@ class Agent(object):
         else:
             return False
 
-    def find_action(self, pattern: Dict[str, str]) -> ActionSet:
+    def find_action(self, pattern: dict[str, str]) -> ActionSet:
         """
         :return: An L{ActionSet} containing an L{Action} that matches all of the field-value pairs in the pattern, if any exist
         """
