@@ -3,10 +3,12 @@ import bz2
 import copy
 import os
 import pickle
+from typing import Optional
 from xml.dom.minidom import Node, parseString
 
 from psychsim.action import act2dict, Action, ActionSet
 from psychsim.probability import Distribution
+from psychsim.pwl.keys import makeFuture, modelKey
 from psychsim.pwl import *
 from psychsim.agent import Agent
 import psychsim.graph
@@ -37,7 +39,7 @@ class World(object):
     """
     memory = False
 
-    def __init__(self,xml=None,stateType=VectorDistributionSet):
+    def __init__(self, xml=None,stateType=VectorDistributionSet):
         """
         :param xml: Initialization argument, either an XML Element, or a filename
         :type xml: Node or str
@@ -150,7 +152,8 @@ class World(object):
         if keySubset is None:
             keySubset = state.keys()
         if real is False:
-            state = copy.deepcopy(state)
+            raise DeprecationWarning('If you want to do hypothetical reasoning, pass in a copy of the state.')
+        prob = 1
         actions = act2dict(actions)
         # Determine the actions taken by the agents in this world
         state, policies, choices = self.deltaAction(state, actions, horizon,
@@ -161,7 +164,7 @@ class World(object):
         # Update turn order
         effect.append(self.deltaTurn(state, policies))
         for stage in effect:
-            state = self.applyEffect(state, stage, select, max_k=max_k)
+            prob *= self.applyEffect(state, stage, select, max_k=max_k)
             state.make_certain()
         # The future becomes the present
         state.rollback()
@@ -183,14 +186,14 @@ class World(object):
             state.rollback()
 
         if select:
-            state.select(select == 'max')
+            prob *= state.select(select == 'max')
         if threshold is not None:
-            state.prune_probability(threshold)
+            prob *= state.prune_probability(threshold)
             state.normalize()
         if self.memory:
             self.history.append(copy.deepcopy(state))
         # self.modelGC(False)
-        return state
+        return prob
 
     def deltaAction(self,state=None,actions=None,horizon=None,tiebreak=None,keySubset=None,debug={}, context=''):
         if state is None:
@@ -272,28 +275,32 @@ class World(object):
             dynamics.update(self.getTurnDynamics(key,actions))
         return dynamics
 
-    def applyEffect(self,state,effect,select=False, max_k=None):
-        if isinstance(select,dict):
-            default_select = select.get('__default__',True)
+    def applyEffect(self, state, effect, select=False, max_k: Optional[int] = None) -> float:
+        if isinstance(select, dict):
+            default_select = select.get('__default__', True)
         else:
             default_select = select
-        if isinstance(effect,list):
+        prob = 1
+        if isinstance(effect, list):
             for stage in effect:
-                state = self.applyEffect(state,stage,select)
+                prob *= self.applyEffect(state, stage, select)
         else:
-            for key,dynamics in effect.items():
+            for key, dynamics in effect.items():
                 if dynamics is None:
                     pass
                 elif len(dynamics) == 1:
                     tree = dynamics[0]
-                    if select:
-                        if select == 'max':
-                            tree = tree.sample(True,None if isinstance(state,VectorDistributionSet) else state)
-                        elif select is True:
-                            tree = tree.sample(False,None if isinstance(state,VectorDistributionSet) else state)
-                        elif default_select and key not in select:
-                            # We are selecting a specific value, just not for this particular state feature
-                            tree = tree.sample(False,None if isinstance(state,VectorDistributionSet) else state)
+                    # if select:
+                    #     if select == 'max':
+                    #         tree, subprob = tree.sample(True, state)  # None if isinstance(state,VectorDistributionSet) else state)
+                    #     elif select is True:
+                    #         tree, subprob = tree.sample(False, state)  # None if isinstance(state,VectorDistributionSet) else state)
+                    #     elif default_select and key not in select:
+                    #         # We are selecting a specific value, just not for this particular state feature
+                    #         tree, subprob = tree.sample(False, state)  # None if isinstance(state,VectorDistributionSet) else state)
+                    #     else:
+                    #         subprob = 1
+                    #     prob *= subprob
                     for in_key in tree.getKeysIn():
                         if isFuture(in_key) and in_key not in state:
                             state.copy_value(makePresent(in_key), in_key)
@@ -330,16 +337,16 @@ class World(object):
                                 raise TypeError('Unable to generate selective effect from:\n%s' % (tree))
                     else:
                         state *= tree
-                if isinstance(select,dict) and key in select:
+                if isinstance(select, dict) and key in select:
                     if select[key] not in state.marginal(makeFuture(key)):
-                        raise ValueError('Selecting impossible value "%s" for %s (nonzero probability for %s)' % \
-                            (self.float2value(key,select[key]),key,
-                                ', '.join(['"%s"' % (self.float2value(key,el)) 
-                                    for el in state.marginal(makeFuture(key)).domain()])))
-                    state[makeFuture(key)] = select[key]
+                        value = self.float2value(key, select[key])
+                        nonzero = ', '.join(['"%s"' % (self.float2value(key, el)) 
+                                             for el in state.marginal(makeFuture(key)).domain()])
+                        raise ValueError(f'Selecting impossible value "{value}" for {key} (nonzero probability for {nonzero})')
+                    prob *= state.setitem(makeFuture(key), select[key])
                 if max_k is not None:
-                    state.prune_size(max_k)
-        return state
+                    prob *= state.prune_size(max_k)
+        return prob
 
     def addTermination(self,tree,action=True):
         """
