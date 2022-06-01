@@ -192,7 +192,7 @@ class Distribution:
         """
         :returns: an element from this domain, with a sample probability given by this distribution
         """
-        return random.choices([item[0] for item in self.__items], [item[1] for item in self.__items])
+        return random.choices(self.__items, [item[1] for item in self.__items])[0]
 
     def set(self, element):
         """
