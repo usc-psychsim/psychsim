@@ -53,7 +53,7 @@ class VectorDistributionSet:
     def keys(self):
         return self.keyMap.keys()
 
-    def __contains__(self,key):
+    def __contains__(self, key):
         return key in self.keyMap
     
     def __iter__(self):
@@ -111,24 +111,30 @@ class VectorDistributionSet:
         Computes a conditional probability of this distribution given the value for this key. To do so, it removes any elements from the distribution that are inconsistent with the given value and then normalizes.
         .. warning:: If you want to overwrite any existing values for this key use L{join} (which computes a new joint probability)
         """
+        self.setitem(key, value)
+        
+    def setitem(self, key, value):
         substate = self.keyMap[key]
         if substate is None:
             if self.certain[key] != value:
                 raise ValueError(f'P({key}={value}) = 0 because {key}={self.certain[key]}')
         else:
+            prob = 0
             dist = self.distributions[substate]
             items = dist._Distribution__items
             i = 0
             while i < len(items):
-                if abs(items[i][0][key]-value) > 1e-8:
-                    del items[i]
-                else:
+                if math.isclose(items[i][0][key], value):
+                    prob += items[i][1]
                     i += 1
+                else:
+                    del items[i]
             if len(items) == 0:
                 raise ValueError(f'P({key}={value}) = 0)')
             else:
                 dist.normalize()
-        
+            return prob
+
     def subDistribution(self,key):
         raise DeprecationWarning('Use "subdistribution" instead.')
 
@@ -429,11 +435,13 @@ class VectorDistributionSet:
     def prune(self, threshold):
         raise DeprecationWarning('Use prune_probability or prune_size')
 
-    def prune_probability(self, threshold):
+    def prune_probability(self, threshold: float) -> float:
+        prob = 1
         for dist in self.distributions.values():
-            dist.prune_probability(threshold)
+            prob *= dist.prune_probability(threshold)
+        return prob
 
-    def prune_size(self, k=1):
+    def prune_size(self, k: int = 1) -> float:
         if len(self) > k:
             # List of substate/distribution pairs for uncertain subdistributions
             dist_list = [dist_tup for dist_tup in self.distributions.items() if len(dist_tup[1]) > 1]
