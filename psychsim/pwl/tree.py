@@ -1,6 +1,5 @@
 import logging
-
-from xml.dom.minidom import Document,Node
+from typing import Any
 
 from psychsim.probability import Distribution
 from psychsim.action import Action
@@ -9,6 +8,7 @@ from psychsim.pwl.keys import CONSTANT,makeFuture,makePresent,isFuture
 from psychsim.pwl.vector import KeyedVector
 from psychsim.pwl.matrix import KeyedMatrix,setToConstantMatrix
 from psychsim.pwl.plane import KeyedPlane,equalRow
+
 
 class KeyedTree:
     """
@@ -20,36 +20,34 @@ class KeyedTree:
     @ivar branch: the hyperplane branch at this node (if applicable)
     @type branch: L{KeyedPlane}
     """
-    def __init__(self,leaf=None):
+    def __init__(self, leaf=None, plane=None, children=None):
         self._string = None
         self._keysIn = None
         self._keysOut = None
-        if isinstance(leaf,Node):
-            self.parse(leaf)
+        if plane is not None:
+            self.makeBranch(plane, children)
+        elif isinstance(children, Distribution):
+            self.makeProbabilistic(children)
         else:
             self.makeLeaf(leaf)
             
     def isLeaf(self):
-#        assert self.leaf == (len(self.children) == 1 and not isinstance(self.children,Distribution))
         return self.leaf
 
     def getLeaf(self):
         return self.children[None]
 
-    def makeLeaf(self,leaf):
+    def makeLeaf(self, leaf: Any):
         self.children = {None: leaf}
         self.leaf = True
         self.branch = None
 
-    def makeBranch(self,plane,children):
+    def makeBranch(self, plane: KeyedPlane, children: dict[Any, Any]):
         self.children = children
         self.branch = plane
         self.leaf = False
 
-    def makeProbabilistic(self,distribution,force=False):
-        assert isinstance(distribution,Distribution)
-        if not force:
-            assert len(distribution) > 1,'Creating a probabilistic branch with a 100% distribution. Use force=True if this is really what you want to do'
+    def makeProbabilistic(self, distribution: Distribution):
         self.children = distribution
         self.branch = None
         self.leaf = False
@@ -510,23 +508,28 @@ class KeyedTree:
             # Leaf node (not a very smart use of graft, but who are we to judge)
             self.makeLeaf(root)
 
-    def sampleLeaf(self,vector,mostlikely=False):
+    def sampleLeaf(self, vector, mostlikely=False):
         """
         :param mostlikely: if True, then only the most likely branches are chosen at each probabilistic branch
         :type mostlikely: bool
         :return: a leaf node sampled from the distribution over leaf nodes for the given vector
         """
         if self.isLeaf():
-            return self.children[None]
+            return self.getLeaf(), 1
         elif self.branch is None:
             # Probabilistic branch
             if mostlikely:
-                return self.children.max().sampleLeaf(vector,mostlikely)
+                subtree = self.children.max()
+                subprob = self.children[subtree]
+                final_tree, final_prob = subtree.sampleLeaf(vector, mostlikely)
+                return final_tree, subprob*final_prob
             else:
-                return self.children.sample().sampleLeaf(vector,mostlikely)
+                subtree, subprob = self.children.sample()
+                final_tree, final_prob = subtree.sampleLeaf(vector, mostlikely)
+                return final_tree, subprob*final_prob
         else:
             # Deterministic branch
-            return self.children[self.branch.evaluate(vector)].sampleLeaf(vector,mostlikely)
+            return self.children[self.branch.evaluate(vector)].sampleLeaf(vector, mostlikely)
 
     def sample(self, mostlikely=False, vector=None):
         """
@@ -536,20 +539,27 @@ class KeyedTree:
         :type vector: KeyedVector
         :return: a tree sampled from all of the probabilistic branches
         """
-        if vector is not None:
-            return self.sampleLeaf(vector,mostlikely)
-        result = self.__class__()
-        if self.isLeaf():
-            result.makeLeaf(self.getLeaf())
-        elif self.isProbabilistic():
-            if mostlikely:
-                child = self.children.max()
-            else:
-                child = self.children.sample()
-            result.graft(child.sample(mostlikely))
-        else:
-            result.makeBranch(self.branch,{value: self.children[value].sample(mostlikely) for value in self.children})
-        return result
+        if vector is None:
+            raise ValueError('Unable to sample from tree without a state vector, as the sample likelihood is too hard to compute')
+        return self.sampleLeaf(vector, mostlikely)
+        # result = self.__class__()
+        # if self.isLeaf():
+        #     result.makeLeaf(self.getLeaf())
+        #     prob = 1
+        # elif self.isProbabilistic():
+        #     if mostlikely:
+        #         child = self.children.max()
+        #         prob = self.children[child]
+        #     else:
+        #         child, prob = self.children.sample()
+        #     subtree, subprob = child.sample(mostlikely)
+        #     result.graft(subtree)
+        #     prob *= subprob
+        # else:
+        #     subtrees = [(value, self.children[value].sample(mostlikely) for value in self.children)]
+        #     result.makeBranch(self.branch, {value: subtree[0] for value, subtree in subtrees})
+        #     prob = 1
+        # return result, prob
         
     def prune(self, path=[], variables={}):
         """
