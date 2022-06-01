@@ -6,6 +6,7 @@ import math
 import multiprocessing
 import os
 import random
+from typing import Dict
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -759,6 +760,19 @@ class Agent(object):
         else:
             return False
 
+    def find_action(self, pattern: Dict[str, str]) -> ActionSet:
+        """
+        :return: An L{ActionSet} containing an L{Action} that matches all of the field-value pairs in the pattern, if any exist
+        """
+        for action in self.actions:
+            for candidate in action:
+                for key, value in pattern.items():
+                    if candidate.get(key, None) != value:
+                        break
+                else:
+                    return action
+        raise ValueError(f'Agent {self.name} has no matching action for pattern {pattern}')
+
     """------------------"""
     """State methods"""
     """------------------"""
@@ -960,7 +974,7 @@ class Agent(object):
         if null:
             # A null policy is desired
             model = self.addModel(f'{parent_model}_null', parent=parent_model, horizon=0, beliefs=True, static=True,
-                policy=makeTree(null))
+                policy=makeTree(null), level=0)
         elif self.actions:
             prob = 1/len(self.actions)
             model = self.addModel(f'{parent_model}_{NUM_TO_WORD[0]}', parent=parent_model, horizon=0, beliefs=True, static=True, level=0,
