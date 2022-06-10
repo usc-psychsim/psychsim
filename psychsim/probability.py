@@ -1,7 +1,7 @@
 import heapq
 import math
 import random
-from typing import Any
+from typing import Any, Tuple
 
 
 class Distribution:
@@ -188,7 +188,7 @@ class Distribution:
     def __float__(self):
         return self.expectation()
 
-    def sample(self) -> tuple[Any, float]:
+    def sample(self) -> Tuple[Any, float]:
         """
         :returns: an element from this domain, with a sample probability given by this distribution
         """

@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Dict
 
 from psychsim.probability import Distribution
 from psychsim.action import Action
@@ -42,7 +42,7 @@ class KeyedTree:
         self.leaf = True
         self.branch = None
 
-    def makeBranch(self, plane: KeyedPlane, children: dict[Any, Any]):
+    def makeBranch(self, plane: KeyedPlane, children: Dict[Any, Any]):
         self.children = children
         self.branch = plane
         self.leaf = False
