@@ -7,7 +7,7 @@ from psychsim.world import World
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
 __description__ = 'Example of setting a incorrect belief over another agent\'s feature. Two agents interact with each ' \
-                  'other: a a consumer agent asks for a certain amount of product while a producer agent produces ' \
+                  'other: a consumer agent asks for a certain amount of product while a producer agent produces ' \
                   'that product. The produced amount depends on the producer\'s production capacity and the asked ' \
                   'amount, i.e., produced=asked*capacity. The consumer asks for product according to the producer\'s ' \
                   'capacity: if it observes that the capacity is "full", it will order a "normal" amount, otherwise ' \
