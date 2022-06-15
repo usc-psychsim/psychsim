@@ -965,6 +965,9 @@ class World(object):
                 self.extras[key] = '%s:%d' % (mod,frame[2])
 
     def setFeature(self, key, value, state=None, noclobber=False, recurse=False):
+        self.set_feature(key, value, state, noclobber, recurse)
+
+    def set_feature(self, key, value, state=None, noclobber=False, recurse=False):
         """
         Set the value of an individual element of the state vector
         :param key: the label of the element to set
@@ -1145,6 +1148,9 @@ class World(object):
         raise DeprecationWarning('Use float2value method instead')
 
     def defineState(self,entity,feature,domain=float,lo=0.,hi=1.,description=None,combinator=None, codePtr=False):
+        return self.define_state(entity, feature, domain, lo, hi, description, combinator, codePtr)
+
+    def define_state(self, entity, feature, domain=float, lo=0, hi=1, description=None, combinator=None, codePtr=False):
         """
         Defines a state feature associated with a single agent, or with the global world state.
         :param entity: if C{None}, the given feature is on the global world state; otherwise, it is local to the named agent

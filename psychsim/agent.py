@@ -644,6 +644,9 @@ class Agent(object):
     """------------------"""
 
     def addAction(self, action, condition=None, description=None, codePtr=False):
+        return self.add_action(action, condition, description, codePtr)
+
+    def add_action(self, action, condition=None, description=None, codePtr=False):
         """
         :param condition: optional legality condition
         :type condition: L{KeyedPlane}
@@ -659,9 +662,11 @@ class Agent(object):
                     actions.append(atom)
         elif isinstance(action, Action):
             actions.append(action)
+        elif isinstance(action, str):
+            # Assume that this is the verb
+            return self.add_action({'verb': action})
         else:
-            assert isinstance(action, dict), 'Argument to addAction must be at least a dictionary'
-            actions.append(Action(action,description))
+            actions.append(Action(action, description))
         for atom in actions:
             if 'subject' not in atom:
                 # Make me the subject of these actions
