@@ -1,19 +1,26 @@
 from psychsim.agent import Agent
 from psychsim.probability import Distribution
-from psychsim.pwl import makeTree, setToFeatureMatrix, actionKey, incrementMatrix
+from psychsim.pwl import makeTree, setToFeatureMatrix, incrementMatrix, modelKey
 from psychsim.reward import maximizeFeature
 from psychsim.world import World
 
 __author__ = 'Pedro Sequeira'
 __email__ = 'pedrodbs@gmail.com'
-__description__ = 'Example that models one agent navigating left or right along one dimension (one position feature). ' \
-                  'We set a belief to the agent for an incorrect position, and see the agent act based on that belief, ' \
-                  'i.e., in its mind the position is changing, but is not aligned with the real/true position.'
+__description__ = 'Example that models one agent navigating left or right along one dimension (one position feature).' \
+                  ' We set a belief to the agent for an incorrect position, and see the agent act based on that ' \
+                  'belief, i.e., in its mind the position is changing, but it is not aligned with the true position.'
 
 # parameters
-HORIZON = 3
+HORIZON = 1
 DISCOUNT = 1
 MAX_STEPS = 3
+
+
+def _get_belief(feature: str, model: str = None) -> Distribution:
+    if model is None:
+        model = world.getModel(agent.name, unique=True)
+    return world.getFeature(feature, state=agent.getBelief(model=model))
+
 
 if __name__ == '__main__':
 
@@ -47,25 +54,22 @@ if __name__ == '__main__':
     # set order
     world.setOrder([agent.name])
 
-    # agent has initial beliefs about its position, which will be updated after executing actions
-    agent.omega = {actionKey(agent.name)}  # todo should not need this
-    agent.setBelief(pos, Distribution({10: 0.5, 12: 0.5}))
-    # agent.setBelief(pos, 10, get_true_model_name(agent))
+    # agent has initial belief about its position, which will be updated after executing actions
+    agent.set_observations(unobservable=[pos])  # commenting this makes agent observe true pos after 1st step
+    # agent.setBelief(pos, 10, agent.get_true_model())  # deterministic belief
+    agent.setBelief(pos, Distribution({10: 0.5, 12: 0.5}))  # stochastic belief
 
     print('====================================')
-    print('Initial beliefs:')
-    world.printBeliefs(agent.name)
+    print(f'Initial belief about pos:\n{_get_belief(pos)}')
 
     for i in range(MAX_STEPS):
         print('====================================')
-        print('Current pos: {0}'.format(world.getValue(pos)))
+        print(f'Current pos: {world.getFeature(pos)}')
 
         # decision: left, right or no-move?
         step = world.step()
 
         # prints all models and beliefs
         print('____________________________________')
-        print("Updated beliefs:")
-        world.printBeliefs(agent.name)
+        print(f'Updated belief about pos:\n{_get_belief(pos)}')
         print('____________________________________')
-

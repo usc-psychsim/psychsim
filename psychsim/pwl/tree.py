@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Dict
 
 from psychsim.probability import Distribution
 from psychsim.action import Action
@@ -42,7 +42,7 @@ class KeyedTree:
         self.leaf = True
         self.branch = None
 
-    def makeBranch(self, plane: KeyedPlane, children: dict[Any, Any]):
+    def makeBranch(self, plane: KeyedPlane, children: Dict[Any, Any]):
         self.children = children
         self.branch = plane
         self.leaf = False
@@ -767,6 +767,16 @@ def makeTree(table, normalize=True):
         return table
     elif isinstance(table, KeyedMatrix):
         return KeyedTree(table)
+    elif isinstance(table, Distribution):
+        tree = KeyedTree()
+        branch = {}
+        for subtable, prob in table.items():
+            branch[makeTree(subtable, normalize)] = prob
+        dist = Distribution(branch)
+        if normalize:
+            dist.normalize()
+        tree.makeProbabilistic(dist)
+        return tree
     elif 'if' in table:
         # Binary deterministic branch
         tree = KeyedTree()
