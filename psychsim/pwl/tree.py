@@ -767,6 +767,16 @@ def makeTree(table, normalize=True):
         return table
     elif isinstance(table, KeyedMatrix):
         return KeyedTree(table)
+    elif isinstance(table, Distribution):
+        tree = KeyedTree()
+        branch = {}
+        for subtable, prob in table.items():
+            branch[makeTree(subtable, normalize)] = prob
+        dist = Distribution(branch)
+        if normalize:
+            dist.normalize()
+        tree.makeProbabilistic(dist)
+        return tree
     elif 'if' in table:
         # Binary deterministic branch
         tree = KeyedTree()
