@@ -2,7 +2,7 @@
 Decision-theoretic agents with Theory of Mind for social simulation.
 
 # Documentation
-The latests documentation can be found [here][3].
+The latest documentation can be found [here][3].
 
 # Installation/Development
 In order to install the module for development (see pip [docs][1]):
