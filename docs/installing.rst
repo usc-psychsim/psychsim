@@ -11,10 +11,8 @@ Installing
 
 3. Profit
 
-Uninstalling
-============
 
-1. ::
+Uninstall::
 
      pip uninstall psychsim
 
