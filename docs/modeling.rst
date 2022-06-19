@@ -47,17 +47,17 @@ Unary State Features
 
 It can be useful to describe a state feature as being local to an individual agent. Doing so does *not* limit the dependency or influence of the state feature in any way. However, it can be useful to define state features as local to an agent to make the system output more readable. For example, the following defines a state feature "troops" for the previously defined agent "Freedonia"::
 
-   troops = world.defineState(free.name,'troops')
+   troops = world.defineState(free.name, 'troops')
 
 The return value of :py:meth:`~psychsim.world.World.defineState` is the unique symbol that PsychSim assigns to this newly defined state feature. To set the value for this state feature, you can either use this symbol with :py:meth:`~psychsim.world.World.setFeature`, the original agent/feature combination with :py:meth:`~psychsim.world.World.setState`, or the feature name with :py:meth:`~psychsim.agent.Agent.setState`. In other words, the following three statements are completely interchangeable::
 
-  world.setFeature(troops,40000)
-  world.setState(free.name,'troops',40000)
-  free.setState('troops',40000)
+  world.setFeature(troops, 40000)
+  world.setState(free.name, 'troops', 40000)
+  free.setState('troops', 40000)
 
 For state features which are not local to any agent, a special agent name (i.e., :py:const:`~psychsim.pwl.keys.WORLD`) indicates that the state feature will pertain to the world as a whole. Again, from the system's perspective, this makes no difference, but it can be useful to distinguish global and local state in presentation::
 
-   treaty = world.defineState(WORLD,'treaty')
+   treaty = world.defineState(WORLD, 'treaty')
 
 Thus, one reason for creating an agent is to group a set of such state features under a common name, as opposed to leaving them as part of the global world state.
 
@@ -67,16 +67,16 @@ Binary State Features
 
 There can also be state features that represent the *relationship* between two agents::
 
-  freeTrustsSyl = world.defineRelation(free.name,'Sylvania','trusts')
+  freeTrustsSyl = world.defineRelation(free.name, 'Sylvania', 'trusts')
 
 The order in which the agents appear in this definition *does* matter, as reversing the order will generate a reference to a different element of the state vector. For example, if the previous definition corresponds to how much trust Freedonia places in Sylvania, the following variation  would correspond to how much trust Sylvania places in Freedonia::
 
-   sylTrustsFree = world.defineRelation('Sylvania',free.name,'trusts')
+   sylTrustsFree = world.defineRelation('Sylvania', free.name, 'trusts')
 
 The values associated with these relationships can be read and written in the same way as for unary state features. However, there are no helper methods like :py:meth:`~psychsim.world.World.setState` or :py:meth:`~psychsim.agent.Agent.getState`. Rather, you should use the symbol returned by :py:meth:`~psychsim.world.World.defineRelation` in combination with :py:meth:`~psychsim.world.World.setFeature`::
 
-   world.setFeature(freeTrustsSyl,0.25)
-   world.setFeature(sylTrustsFree,0.75)
+   world.setFeature(freeTrustsSyl, 0.25)
+   world.setFeature(sylTrustsFree, 0.75)
 
 Types of State Features
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -97,20 +97,20 @@ list/set
 
 By default, a variable is assumed to be float-valued, so the previous sections definitions of state features created only float-valued variables. Both the :py:meth:`~psychsim.world.World.defineState` and :py:meth:`~psychsim.world.World.defineRelation` methods take optional arguments to modify the domain of valid values of the feature. The following definition has the identical effect as the previous trust definition, but it makes the default values for the variable type and range of possible values explicit::
 
-  freeTrustsSyl = world.defineRelation(free.name,'Sylvania','trusts',float,-1,-1)
+  freeTrustsSyl = world.defineRelation(free.name, 'Sylvania', 'trusts', float, -1, -1)
 
 This relationship can now distinguish between a trusting and distrusting relationship (positive vs. negative values), with a fine-grained magnitude of the degree of (dis)trust. It is also possible to specify that a state feature has an integer-valued domain instead::
 
-   troops = world.defineState(free.name,'troops',int,0,50000)
+   troops = world.defineState(free.name, 'troops', int, 0, 50000)
 
 One can also define a boolean state feature, where no range of values is necessary::
 
-  treaty = world.defineState(WORLD,'treaty',bool)
+  treaty = world.defineState(WORLD, 'treaty', bool)
 
 It is also possible to define an enumerated list of possible state features. Like all feature values, PsychSim represents these numerically within the actual state, but you do not need to ever use the numeric values::
              
-   phase = world.defineState(WORLD,'phase',list,['offer','respond','rejection','end','paused','engagement'])
-   world.setState(WORLD,'phase','rejection')
+   phase = world.defineState(WORLD, 'phase', list, ['offer', 'respond', 'rejection', 'end', 'paused', 'engagement'])
+   world.setState(WORLD, 'phase', 'rejection')
 
 Actions
 -------
@@ -126,16 +126,16 @@ The `verb` of an individual action is a required field when defining the action:
 
 The action created will also have a `subject` field, representing the agent who is performing this action. The `subject` field is automatically filled in with the name of the agent ("Freedonia" in the above example). A third optional field, `object`, can represent the target of the specific action::
 
-   battle = free.addAction({'verb': 'attack','object': 'Sylvania'})
+   battle = free.addAction({'verb': 'attack', 'object': 'Sylvania'})
 
 An action's field values can be accessed in the same way as entries in a dictionary::
 
    if action['verb'] == 'reject' and action['object'] == 'Sylvania':
-      print('Sylvania has been rejected by %s' % (action['subject']))
+      print(f'Sylvania has been rejected by {action["subject"]}')
 
 You are free to define any other fields as well to contain other parameterizations of the actions::
 
-  offer50 = free.addAction({'verb': 'offer','object': sylv.name,'amount': 50})
+  offer50 = free.addAction({'verb': 'offer','object': sylv.name, 'amount': 50})
 
 We will describe the use of these fields in :ref:`sec-dynamics`.
 
@@ -166,7 +166,7 @@ The fragment above illustrates one helpful shortcut for :py:class:`~psychsim.act
 Probability
 -----------
 
-I don't know whether you already know this, but uncertainty is everywhere in social interaction. As a result, :py:class:`~psychsim.probability.Distribution` objects are central to PsychSim's representations. Probability distributions can be treated as dictionaries, where the keys are the elements of the sample space, and the values are the probabilities associated with them. For example, we can represent a fair coin with the following distribution::
+Maybe you already know this, but uncertainty is everywhere in social interaction. As a result, :py:class:`~psychsim.probability.Distribution` objects are central to PsychSim's representations. Probability distributions can be treated as dictionaries, where the keys are the elements of the sample space, and the values are the probabilities associated with them. For example, we can represent a fair coin with the following distribution::
 
   coin = Distribution({'heads': 0.5, 'tails': 0.5})
   if coin.sample() == 'heads':
@@ -191,18 +191,18 @@ The :py:class:`~psychsim.probability.Distribution` is sufficiently expressive fo
 
 In particular, the state of the world is represented as a :py:class:`~psychsim.pwl.state.VectorDistributionSet` that represents a probability distribution over possible worlds::
 
-  world.setState(WORLD,'phase','engagement')
-  world.setState(WORLD,'winner',Distribution({'Sylvania': 0.25, 'Freedonia': 0.75}))
-  free.setState('troops',Distribution({10000: 0.25, 25000: 0.75}))
+  world.setState(WORLD, 'phase', 'engagement')
+  world.setState(WORLD, 'winner', Distribution({'Sylvania': 0.25, 'Freedonia': 0.75}))
+  free.setState('troops', Distribution({10000: 0.25, 25000: 0.75}))
 
 These statements declare that the simulation is currently in the `engagement` phase, with a 75% chance that the winner is Freedonia vs. a 25% chance that it is Sylvania, and with Freedonia having a 75% chance of having 25000 troops vs. a 25% chance of having 10000. These three state features have independent distributions within the state. In this state, the probability that Freedonia is the winner with 25000 troops remaining is 56.25%.
 
 If we want to instead specify that Freedonia has 25000 troops if and only if it is the winner, then we specify a joint probability over `winner` and `troops`. To do so, we use a :py:class:`~psychsim.pwl.vector.KeyedVector` to represent elements of the joint sample space::
 
-  freeVictory = KeyedVector({stateKey(WORLD,'winner'): 'Freedonia',
-                             stateKey(free.name,'troops':): 25000})
-  sylvVictory = KeyedVector({stateKey(WORLD,'winner'): 'Sylvania',
-                             stateKey(free.name,'troops':): 10000})
+  freeVictory = KeyedVector({stateKey(WORLD, 'winner'): 'Freedonia',
+                             stateKey(free.name, 'troops':): 25000})
+  sylvVictory = KeyedVector({stateKey(WORLD, 'winner'): 'Sylvania',
+                             stateKey(free.name, 'troops':): 10000})
 
 over possible worlds. Thus, even though the above method call specificies a single value, the value is internally represented as a distribution with a single element (i.e., 40000) having 100% probability. We can also pass in a distribution of possible values for a state feature:
 
@@ -211,13 +211,13 @@ The :py:class:`~psychsim.probability.Distribution` constructor takes a dictionar
 
 If you would like more fine-grained control over the possible worlds, simply manipulate the distribution directly. Note that the world state is potentially a dictionary of distributions over worlds, although until further development occurs, the only entry in that table is indexed by {\tt None}:::
 
-   possworld1 = KeyedVector({stateKey(free.name,'troops'): 40000, 
-                             stateKey(free.name,'cost'): 1000})
+   possworld1 = KeyedVector({stateKey(free.name, 'troops'): 40000, 
+                             stateKey(free.name, 'cost'): 1000})
    possworld2 = KeyedVector(possworld1)
-   possworld2[stateKey(free.name,'cost')] = 2000
+   possworld2[stateKey(free.name, 'cost')] = 2000
    possworld3 = KeyedVector()
-   possworld3[stateKey(free.name,'troops')] = 25000
-   possworld3[stateKey(free.name,'cost')] = 2000
+   possworld3[stateKey(free.name, 'troops')] = 25000
+   possworld3[stateKey(free.name, 'cost')] = 2000
 
    world.state[None].clear()
    world.state[None][possworld1] = 0.1
@@ -228,8 +228,8 @@ When querying for a given state feature, the returned value is *always* in :py:c
 
    value = world.getState(free.name,'phase')
    for phase in value.domain():
-      print 'P(%s=%s) = %5.3f' % (stateKey(free.name,'phase'),
-                                  phase,value[phase])
+      print('P(%s=%s) = %5.3f' % (stateKey(free.name,'phase'),
+                                  phase,value[phase]))
 
 The :py:func:`~psychsim.pwl.keys.stateKey` function is useful for translating an agent (or the world) and state feature into a canonical string representation::
 
@@ -237,7 +237,7 @@ The :py:func:`~psychsim.pwl.keys.stateKey` function is useful for translating an
    s = KeyedVector({'S_0': 0.3, 'S_1': 0.7})
    s['S_n'] = 0.4
    for key in s:
-      print(key,s[key])
+      print(key, s[key])
 
 Notice that PsychSim allows you to refer to each feature by a meaningful *key*, as in Python's dictionary keys. Keys are treated internally as unstructured strings, but you may find it useful to make use of the the following types of structured keys.
 
@@ -252,10 +252,10 @@ Legality
 
 Legality::
 
-   tree = makeTree({'if': equalRow(stateKey(WORLD,'phase'),'offer'),
+   tree = makeTree({'if': equalRow(stateKey(WORLD, 'phase'), 'offer'),
                     True: True,    
                     False: False})
-   free.setLegal(action,tree)
+   free.setLegal(action, tree)
 
 .. _sec-dynamics:
 
@@ -267,7 +267,7 @@ Termination
 
 *Termination* conditions specify when scenario execution should reach an absorbing end state (e.g., when a final goal is reached, when time has expired). A termination condition is a PWL function (Section \ref{sec:pwl}) with boolean leaves.::
 
-   world.addTermination(makeTree({'if': trueRow(stateKey(WORLD,'treaty')),
+   world.addTermination(makeTree({'if': trueRow(stateKey(WORLD, 'treaty')),
                                   True: True, False: False}))
 
 This condition specifies that the simulation ends if a "treaty" is reached. Multiple conditions can be specified, with termination occurring if any condition is true.
@@ -278,10 +278,10 @@ Reward
 
 An agent's *reward* function represents its (dis)incentives for choosing certain actions. In other agent frameworks, this same component might be referred to as the agent's *utility* or *goals*. It is often convenient to separate different aspects of the agent's reward function::
 
-    goalFTroops = maximizeFeature(stateKey(free.name,'troops'))
-    free.setReward(goalFTroops,1.)
-    goalFTerritory = maximizeFeature(stateKey(free.name,'territory'))
-    free.setReward(goalFTerritory,1.)
+    goalFTroops = maximizeFeature(stateKey(free.name, 'troops'))
+    free.setReward(goalFTroops, 1)
+    goalFTerritory = maximizeFeature(stateKey(free.name, 'territory'))
+    free.setReward(goalFTerritory, 1)
 
 Models
 ------
