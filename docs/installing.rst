@@ -3,11 +3,18 @@ Installing
 
 1. Clone the repository::
 
-     git clone https://github.com/pynadath/psychsim.git
+     git clone https://github.com/usc-psychsim/psychsim.git
 
-2. Checkout the HRI branch::
+2. Install system-wide by running the following from the installation directory::
 
-     git checkout hri
+     pip install -e .
 
 3. Profit
-   
+
+Uninstalling
+============
+
+1. ::
+
+     pip uninstall psychsim
+
