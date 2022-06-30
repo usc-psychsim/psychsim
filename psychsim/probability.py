@@ -199,8 +199,7 @@ class Distribution:
         Reduce distribution to be 100% for the given element
         :param element: the element that will be the only one with nonzero probability
         """
-        self.clear()
-        self[element] = 1
+        self.__items = [(element, 1)]
 
     def select(self, maximize=False):
         """
