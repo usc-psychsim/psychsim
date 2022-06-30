@@ -1,3 +1,6 @@
+import copy
+import math
+
 from psychsim.probability import Distribution
 from psychsim.action import ActionSet
 from psychsim.world import World
@@ -55,13 +58,13 @@ def add_reward(world):
     world.agents['Jerry'].setReward(maximizeFeature(stateKey('Jerry', 'health'), 'Jerry'), 1)
 
 
-def add_models(world, rationality=1.):
+def add_models(world, rationality=1):
     model = world.agents['Tom'].get_true_model()
     world.agents['Tom'].addModel('friend', rationality=rationality, selection='distribution', horizon=1, parent=model)
-    world.agents['Tom'].setReward(maximizeFeature(stateKey('Jerry','health'),'Tom'),1,'friend')
+    world.agents['Tom'].setReward(maximizeFeature(stateKey('Jerry', 'health'), 'Tom'), 1, 'friend')
     world.agents['Tom'].create_belief_state(model='friend')
     world.agents['Tom'].addModel('foe', rationality=rationality, selection='distribution', horizon=1, parent=model)
-    world.agents['Tom'].setReward(minimizeFeature(stateKey('Jerry','health'),'Tom'),1,'foe')
+    world.agents['Tom'].setReward(minimizeFeature(stateKey('Jerry', 'health'), 'Tom'), 1, 'foe')
     world.agents['Tom'].create_belief_state(model='foe')
     zero = world.agents['Jerry'].zero_level()
     world.setModel('Jerry', zero, 'Tom', 'friend')
@@ -271,3 +274,23 @@ def verify_decision(result, model: str, cls, length=None):
     assert isinstance(decision, cls)
     if length is not None:
         assert len(decision) == length
+
+
+def test_step_select():
+    world = setup_world()
+    add_state(world)
+    actions = add_actions(world)
+    add_dynamics(world, actions)
+    add_reward(world)
+    add_models(world)
+    tom = world.agents['Tom']
+    tom.setAttribute('strict_max', False, tom.get_true_model())
+    tom.setAttribute('sample', False, tom.get_true_model())
+    tom.setAttribute('tiebreak', False, tom.get_true_model())
+    state = copy.deepcopy(world.state)
+    prob = world.step(state=state)
+    assert math.isclose(prob, 1)
+    state = copy.deepcopy(world.state)
+    prob = world.step(state=state, select='max')
+    assert math.isclose(prob, 0.246675822760567)
+    world.printState(state)
