@@ -3,6 +3,7 @@ import bz2
 import copy
 import os
 import pickle
+from io import StringIO
 from typing import Optional
 from xml.dom.minidom import Node, parseString
 
@@ -222,7 +223,7 @@ class World(object):
                             policies[name] = actions[name]
                             choices[name] = {m[makeFuture(action)][CONSTANT] for m in policies[name].leaves()}
                     else:
-                        decision = self.agents[name].decide(state, horizon, actions, None, tiebreak, None, debug=debug.get(name, {}), context=context)
+                        decision = self.agents[name].decide(state=state, horizon=horizon, others=actions, debug=debug.get(name, {}), context=context)
                         if name in debug:
                             debug[name]['__decision__'] = decision
                         try:
@@ -418,9 +419,9 @@ class World(object):
             
             if len(agent.models) == 0:
                 # Default model settings
-                agent.addModel('%s0' % (agent.name), R=None, horizon=2, level=2, rationality=1.,
-                              discount=1., selection='consistent',
-                              beliefs=True, parent=None, projector=Distribution.expectation)
+                agent.addModel(f'{agent.name}0', R=None, horizon=2, level=2, rationality=1,
+                               discount=1, strict_max=True, sample=False, tiebreak=True,
+                               beliefs=True, parent=None, projector=Distribution.expectation)
             if setModel:
                 if isinstance(self.state, VectorDistributionSet):
                     # Initialize model of this agent to be uniform distribution (got a better idea?)
@@ -1594,6 +1595,22 @@ class World(object):
                 raise NotImplementedError
         else:
             raise NotImplementedError
+
+    def __str__(self) -> str:
+        """
+        :return: A string representation of the current world state, including agent beliefs
+        """
+        return(self.state2str(self.state))
+
+    def state2str(self, state: VectorDistributionSet) -> str:
+        """
+        :return: A string representation of the given world state, including agent beliefs
+        """
+        buf = StringIO()
+        self.printState(distribution=state, buf=buf)
+        value = buf.getvalue()
+        buf.close()
+        return value
 
     def printBeliefs(self,name,state=None,buf=None,prefix='',beliefs=True):
         models = self.getModel(name,state)
