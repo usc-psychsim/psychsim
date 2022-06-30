@@ -299,7 +299,7 @@ class VectorDistributionSet:
                 index = index // len(self.distributions[substate])
             yield KeyedVector(vector),prob
 
-    def select(self,maximize=False,incremental=False):
+    def select(self, maximize=False, incremental=False):
         """
         Reduce distribution to a single element, sampled according to the given distribution
         :param incremental: if C{True}, then select each key value in series (rather than picking out a joint vector all at once, default is C{False})
@@ -309,11 +309,17 @@ class VectorDistributionSet:
             prob = KeyedVector()
         else:
             prob = 1
-        for distribution in self.distributions.values():
+        for substate, distribution in list(self.distributions.items()):
             if incremental:
-                prob.update(distribution.select(maximize,incremental))
+                prob.update(distribution.select(maximize, incremental))
             else:
-                prob *= distribution.select(maximize,incremental)
+                prob *= distribution.select(maximize, incremental)
+            # The distribution is now certain, so move variables out of it and delete
+            vector = distribution.first()
+            for key, value in vector.items():
+                self.keyMap[key] = None
+                self.certain[key] = value
+            del self.distributions[substate]
         return prob
 
     def substate(self, obj, ignoreCertain=False):
