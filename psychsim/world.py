@@ -161,7 +161,7 @@ class World(object):
                                                     tiebreak, keySubset, debug,
                                                     context)
         # Compute the effect of the chosen actions
-        effect = self.deltaState(choices,state,keySubset)
+        effect = self.deltaState(choices, state, keySubset)
         # Update turn order
         effect.append(self.deltaTurn(state, policies))
         for stage in effect:
