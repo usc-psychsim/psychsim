@@ -209,7 +209,6 @@ class Agent(object):
             model_list = list(model.domain())
             tree = {'if': equalRow(myModel, model_list)}
             for index, submodel in enumerate(model_list):
-                assert selection is None
                 result[submodel] = self.decide(state=state, horizon=horizon, others=others, model=submodel,
                                                strict_max=strict_max, sample=sample, tiebreak=tiebreak, 
                                                selection=selection, actions=actions, keySet=keySet, 
@@ -269,7 +268,6 @@ class Agent(object):
                 result = {'policy': makeTree(setToConstantMatrix(actionKey(self.name), action)),
                           'action': Distribution({action: 1})}
             return result
-        rationality = self.getAttribute('rationality', model)
         if len(actions) == 0:
             # Someone made a boo-boo because there is no legal action for this agent right now
             raise ValueError(f'{self.name} (model {model} has no available actions when believing:\n{self.world.state2str(belief)}')
@@ -281,11 +279,12 @@ class Agent(object):
                 return {'action': choice}
             else:
                 return {'action': Distribution({choice: 1})}
+        logging.debug(f'{context} {model} deciding among {", ".join([str(a) for a in sorted(actions)])}')
         if horizon is None:
             horizon = self.getAttribute('horizon', model)
         else:
             horizon = min(horizon, self.getAttribute('horizon', model))
-        logging.debug(f'{context} {model} deciding among {", ".join([str(a) for a in sorted(actions)])}')
+        rationality = self.getAttribute('rationality', model)
         # Keep track of value function
         Vfun = self.getAttribute('V', model)
         if Vfun:
