@@ -168,6 +168,7 @@ class Agent(object):
         return model['V'][horizon]
                             
     def decide(self, state=None, horizon=None, others=None, model=None,
+               strict_max=None, sample=None, tiebreak=None,
                selection=None, actions=None, keySet=None, debug={}, 
                context=''):
         """
@@ -208,8 +209,11 @@ class Agent(object):
             model_list = list(model.domain())
             tree = {'if': equalRow(myModel, model_list)}
             for index, submodel in enumerate(model_list):
-                result[submodel] = self.decide(state, horizon, others, submodel,
-                                               selection, actions, keySet, debug, context)
+                assert selection is None
+                result[submodel] = self.decide(state=state, horizon=horizon, others=others, model=submodel,
+                                               strict_max=strict_max, sample=sample, tiebreak=tiebreak, 
+                                               selection=selection, actions=actions, keySet=keySet, 
+                                               debug=debug, context=context)
                 try:
                     matrix = result[submodel]['policy']
                 except KeyError:
@@ -229,8 +233,21 @@ class Agent(object):
                 tree = tree[0]
             result['policy'] = makeTree(tree)
             return result
+        # Backward compatibility
         if selection is None:
-            selection = self.getAttribute('selection',model)
+            selection = self.getAttribute('selection', model)
+        if selection is None:
+            if strict_max is None:
+                strict_max = self.getAttribute('strict_max', model)
+            if sample is None:
+                sample = self.getAttribute('sample', model)
+            if tiebreak is None:
+                tiebreak = self.getAttribute('tiebreak', model)
+            rationality = None
+        else:
+            if strict_max is not None or sample is not None or tiebreak is not None:
+                raise DeprecationWarning('Unable to resolve simultaneous specification of "selection" in combination with "strict_max/sample/tiebreak". Update to use only one or the other.')
+            strict_max, sample, tiebreak = translate_selection(selection)
         # What are my subjective beliefs for this decision?
         belief = self.getBelief(state, model)
         # Identify candidate actions
@@ -245,97 +262,84 @@ class Agent(object):
                 valid_prob = sum([action[a] for a in action.domain() if a in actions])
                 elements = [(a, action[a]/valid_prob) for a in action.domain() if a in actions]
                 result = {'policy': makeTree({'distribution': [(setToConstantMatrix(actionKey(self.name), a), prob) for a, prob in elements]}),
-                          'action': Distribution({a:prob for a, prob in elements})}
+                          'action': Distribution({a: prob for a, prob in elements})}
             else:
+                if action not in actions:
+                    raise ValueError(f'Policy for model {model} specifies out-of-bounds action choice {action}')
                 result = {'policy': makeTree(setToConstantMatrix(actionKey(self.name), action)),
                           'action': Distribution({action: 1})}
             return result
-        if horizon is None:
-            horizon = self.getAttribute('horizon', model)
-        else:
-            horizon = min(horizon, self.getAttribute('horizon',model))
+        rationality = self.getAttribute('rationality', model)
         if len(actions) == 0:
             # Someone made a boo-boo because there is no legal action for this agent right now
-            buf = StringIO()
-            if len(self.getLegalActions(state)) == 0:
-                print('%s [%s] has no legal actions in:' % (self.name,model),file=buf)
-                self.world.printState(state,buf)
-            else:
-                print('%s has true legal actions:' % (self.name),\
-                      ';'.join(map(str,sorted(self.getLegalActions(state)))),file=buf)
-            if len(self.getLegalActions(belief)) == 0:
-                print('%s has no legal actions when believing:' % (self.name),
-                      file=buf)
-                self.world.printState(belief,buf)
-            else:
-                print('%s believes it has legal actions:' % (self.name),\
-                      ';'.join(map(str,sorted(self.getLegalActions(belief)))),file=buf)
-            msg = buf.getvalue()
-            buf.close()
-            raise RuntimeError(msg)
+            raise ValueError(f'{self.name} (model {model} has no available actions when believing:\n{self.world.state2str(belief)}')
         elif len(actions) == 1:
             # Only one possible action
             choice = next(iter(actions))
             assert choice in self.getLegalActions(belief)
-            if selection == 'distribution':
-                return {'action': Distribution({choice: 1.})}
-            else:
+            if sample:
                 return {'action': choice}
-        logging.debug('{} {} deciding among {}'.format(context, model, ', '.join([str(a) for a in sorted(actions)])))
+            else:
+                return {'action': Distribution({choice: 1})}
+        if horizon is None:
+            horizon = self.getAttribute('horizon', model)
+        else:
+            horizon = min(horizon, self.getAttribute('horizon', model))
+        logging.debug(f'{context} {model} deciding among {", ".join([str(a) for a in sorted(actions)])}')
         # Keep track of value function
-        Vfun = self.getAttribute('V',model)
+        Vfun = self.getAttribute('V', model)
         if Vfun:
             # Use stored value function
             V = {}
             for action in actions:
                 b = copy.deepcopy(belief)
                 b *= Vfun[action]
-                V[action] = {'__EV__': b[rewardKey(self.name,True)].expectation()}
+                V[action] = {'__EV__': b[rewardKey(self.name, True)].expectation()}
                 logging.debug('{} V_{}^{}({})={}'.format(context, model, horizon, action, V[action]['__EV__']))
         elif self.parallel:
             with multiprocessing.Pool() as pool:
-                results = [(action,pool.apply_async(self.value,
-                                                    args=(belief,action,model,horizon,others,keySet)))
+                results = [(action, pool.apply_async(self.value,
+                                                     args=(belief, action, model, horizon, others, keySet)))
                            for action in actions]
-                V = {action: result.get() for action,result in results}
-        else:
+                V = {action: result.get() for action, result in results}
+        elif rationality != 0:
             # Compute values in sequence
             V = {}
             for action in actions:
-                V[action] = self.value(belief,action,model,horizon,others,keySet, debug=debug, context=context)
+                V[action] = self.value(belief, action, model, horizon, others, keySet, debug=debug, context=context)
                 logging.debug('{} V_{}^{}({})={}'.format(context, model, horizon, action, V[action]['__EV__']))
-        best = None
-        for action in actions:
-            # Determine whether this action is the best
-            if best is None:
-                best = [action]
-            elif V[action]['__EV__'] == V[best[0]]['__EV__']:
-                best.append(action)
-            elif V[action]['__EV__'] > V[best[0]]['__EV__']:
-                best = [action]
-        result = {'V*': V[best[0]]['__EV__'],'V': V}
-        # Make an action selection based on the value function
-        if selection == 'distribution':
-            values = {}
-            for key,entry in V.items():
-                values[key] = entry['__EV__']
-            result['action'] = Distribution(values, self.getAttribute('rationality', model))
-        elif len(best) == 1:
-            # If there is only one best action, all of the selection mechanisms devolve 
-            # to the same unique choice
-            result['action'] = best[0]
-        elif selection == 'random':
-            result['action'] = random.sample(best,1)[0]
-        elif selection == 'uniform':
-            result['action'] = {}
-            prob = 1./float(len(best))
-            for action in best:
-                result['action'][action] = prob
-            result['action'] = Distribution(result['action'])
+        if rationality == 0:
+            # Uniform value function over all actions
+            strict_max = True  # softmax does not really make any sense here, so let's not get fancy
+            best = actions
+            result = {}
         else:
-            assert selection == 'consistent','Unknown action selection method: %s' % (selection)
-            best.sort()
-            result['action'] = best[0]
+            best = None
+            for action in actions:
+                # Determine whether this action is the best
+                if best is None:
+                    best = [action]
+                elif V[action]['__EV__'] == V[best[0]]['__EV__']:
+                    best.append(action)
+                elif V[action]['__EV__'] > V[best[0]]['__EV__']:
+                    best = [action]
+            result = {'V*': V[best[0]]['__EV__'], 'V': V}
+        # Make an action selection based on the value function
+        if strict_max:
+            if len(best) == 1:
+                # If there is only one best action, all of the selection mechanisms devolve 
+                # to the same unique choice
+                result['action'] = best[0]
+            elif tiebreak:
+                result['action'] = min(best)
+            else:
+                prob = 1/float(len(best))
+                result['action'] = Distribution({action: prob for action in best})
+        else:
+            values = {key: entry['__EV__'] for key, entry in V.items()}
+            result['action'] = Distribution(values, self.getAttribute('rationality', model))
+        if sample and isinstance(result['action'], Distribution):
+            result['action'], prob = result['action'].sample()
         logging.debug('{} Choosing {}'.format(context, result['action']))
         return result
 
@@ -969,22 +973,29 @@ class Agent(object):
         """
         return self.world.getModel(self.name, unique=unique)
 
-    def zero_level(self, parent_model=None, null=None):
+    def zero_level(self, parent_model=None, null=None, **kwargs) -> str:
         """
         :rtype: str
         """
         if parent_model is None:
             parent_model = self.get_true_model()
         if null:
-            # A null policy is desired
-            model = self.addModel(f'{parent_model}_null', parent=parent_model, horizon=0, beliefs=True, static=True,
-                policy=makeTree(null), level=0)
+            # A fixed action policy is desired
+            model = self.addModel(f'{parent_model}_null', parent=parent_model, 
+                                  horizon=0, beliefs=True, static=True,
+                                  policy=makeTree(null), level=0, **kwargs)
         elif self.actions:
-            prob = 1/len(self.actions)
-            model = self.addModel(f'{parent_model}_{NUM_TO_WORD[0]}', parent=parent_model, horizon=0, beliefs=True, static=True, level=0,
-                policy=makeTree({'distribution': [(action, prob) for action in self.actions]}))
+            default = {'beliefs': True, 'static': True, 'strict_max': True, 'sample': False,
+                       'tiebreak': False}
+            default.update(kwargs)
+            model = self.addModel(f'{parent_model}_{NUM_TO_WORD[0]}', 
+                                  parent=parent_model, level=0,
+                                  # policy=makeTree({'distribution': [(action, prob) for action in self.actions]}),
+                                  **default)
         else:
-            model = self.addModel(f'{parent_model}{NUM_TO_WORD[0]}', parent=parent_model, horizon=0, beliefs=True, static=True, level=0)
+            model = self.addModel(f'{parent_model}{NUM_TO_WORD[0]}', 
+                                  parent=parent_model, horizon=0, beliefs=True, 
+                                  static=True, level=0, **kwargs)
         return model['name']
 
     def n_level(self, n, parent_models=None, null={}, prefix='', **kwargs):
@@ -1476,9 +1487,10 @@ class Agent(object):
                     beliefs = copy.deepcopy(original)
                     # Project direct effect of the actions, including possible observations
                     others = [name for name in self.world.agents if modelKey(name) in beliefs and name != self.name]
-                    outcome = self.world.step({self.name: myAction} if myAction else None, beliefs,
-                        keySubset=beliefs.keys(), horizon=horizon, updateBeliefs=others, 
-                        context=f'{context}updating {self.name}\'s beliefs')
+                    outcome = self.world.step(actions={self.name: myAction} if myAction else None, 
+                                              state=beliefs, keySubset=beliefs.keys(), 
+                                              horizon=horizon, updateBeliefs=others, 
+                                              context=f'{context}updating {self.name}\'s beliefs')
                     # Condition on actual observations
                     for o in self.omega:
                         if o not in beliefs:
@@ -1632,15 +1644,34 @@ class ValueFunction:
             del table[None]
         return table
 
-    def printV(self,agent,horizon):
+    def printV(self, agent, horizon):
         V = self.table[horizon]
         for state in V.keys():
-            print
+            print()
             agent.world.printVector(state)
             print(self.get(agent.name,state,None,horizon))
 
     def __lt__(self,other):
         return self.name < other.name
 
+
 def explain_decision(decision):
     print(decision.keys())
+
+
+def translate_selection(selection: str) -> (bool, bool, bool):
+    """
+    :return: (strict_max, sample, tiebreak)
+    """
+    if selection == 'consistent':
+        return True, True, True
+    elif selection == 'softmax':
+        return False, True, False
+    elif selection == 'distribution':
+        return False, False, False
+    elif selection == 'random':
+        return True, True, False
+    elif selection == 'uniform':
+        return True, False, False
+    else:
+        raise NameError(f'Unknown action selection method: {selection}')
