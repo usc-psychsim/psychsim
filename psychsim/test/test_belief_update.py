@@ -291,6 +291,13 @@ def test_step_select():
     prob = world.step(state=state)
     assert math.isclose(prob, 1)
     state = copy.deepcopy(world.state)
+    prob = world.step(state=state, select=True)
+    assert len(state) == 1
+    action = world.getAction(tom.name, state, True)
+    if action == actions['hit']:
+        assert math.isclose(prob, 0.246675822760567)
+    else:
+        raise NotImplementedError(f'Have not recorded whether unlikely probability is {prob}')
+    state = copy.deepcopy(world.state)
     prob = world.step(state=state, select='max')
     assert math.isclose(prob, 0.246675822760567)
-    world.printState(state)
