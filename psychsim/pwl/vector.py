@@ -363,7 +363,7 @@ class VectorDistribution(Distribution):
         result.remove_duplicates()
         return result
 
-    def select(self,maximize=False,incremental=False):
+    def select(self, maximize=False, incremental=False):
         """
         :param incremental: if C{True}, then select each key value in series (rather than picking out a joint vector all at once, default is C{False})
         """
