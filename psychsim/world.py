@@ -1472,7 +1472,9 @@ class World(object):
             for model in agent.models.values():
                 if 'beliefs' in model:
                     # Verify that I have correct beliefs about myself
-                    if modelKey(agent.name) in model['beliefs']:
+                    if model['beliefs'] is True:
+                        pass
+                    elif modelKey(agent.name) in model['beliefs']:
                         belief = self.getFeature(modelKey(agent.name), model['beliefs'])
                         if len(belief) > 1:
                             errors.append('Agent {} has uncertain belief about itself under model {}'.format(agent.name, model['name']))
