@@ -1190,11 +1190,11 @@ class World(object):
         """
         return self.getFeature(stateKey(entity,feature),state,unique)
 
-    def getAction(self,name=None,state=None,unique=False):
+    def getAction(self, name=None, state=None, unique=False):
         """
         :return: the C{ActionSet} last performed by the given entity
         """
-        return self.getFeature(actionKey(name),state,unique)
+        return self.getFeature(actionKey(name), state, unique)
         
     def defineRelation(self,subj,obj,name,domain=float,lo=0.,hi=1.,**kwargs):
         """
