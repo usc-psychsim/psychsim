@@ -275,7 +275,7 @@ class Agent(object):
             # Only one possible action
             choice = next(iter(actions))
             assert choice in self.getLegalActions(belief)
-            if sample:
+            if sample or tiebreak:
                 return {'action': choice}
             else:
                 return {'action': Distribution({choice: 1})}
