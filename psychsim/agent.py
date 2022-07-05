@@ -918,7 +918,7 @@ class Agent(object):
             model = self.get_true_model()
         beliefs = self.models[model]['beliefs']
         if beliefs is True:
-            beliefs = self.create_belief_state(model)
+            beliefs = self.create_belief_state(model=model)
         if isinstance(agents, str):
             for key in list(beliefs.keys()):
                 if isStateKey(key) and state2agent(key) == agents:
