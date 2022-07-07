@@ -922,7 +922,7 @@ class Agent(object):
             model = self.get_true_model()
         beliefs = self.models[model]['beliefs']
         if beliefs is True:
-            beliefs = self.create_belief_state(model)
+            beliefs = self.create_belief_state(model=model)
         if isinstance(agents, str):
             for key in list(beliefs.keys()):
                 if isStateKey(key) and state2agent(key) == agents:
@@ -1515,7 +1515,7 @@ class Agent(object):
                                     continue
                                 else:
                                     newModel = None
-                                    logging.warning(f'{context} {self.name} (model {oldModel}) has impossible observation {o}={self.world.float2value(o,vector[o])} when doing {myAction}')
+                                    logging.warning(f'{context} {self.name} (model {oldModel}) has impossible observation {o}={self.world.float2value(o, value)} instead of {self.world.float2value(o, b[o])} when doing {myAction}')
                                     logging.warning(f'def:\n{self.world.getFeature(o, beliefs)}')
                                     if o in self.world.dynamics and myAction in self.world.dynamics[o]:
                                         logging.warning('Action effect is:\n%s' % (self.world.dynamics[o][myAction]))

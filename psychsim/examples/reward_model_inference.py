@@ -1,7 +1,8 @@
+import random
 from psychsim.agent import Agent
 from psychsim.probability import Distribution
 from psychsim.world import World
-from psychsim.pwl import makeTree, modelKey, incrementMatrix
+from psychsim.pwl import makeTree, modelKey, incrementMatrix, setToConstantMatrix, rewardKey
 from psychsim.reward import maximizeFeature, minimizeFeature
 
 __author__ = 'Pedro Sequeira'
@@ -18,6 +19,7 @@ AGENT_NAME = 'actor'
 OBSERVER_NAME = 'observer'
 HORIZON = 2
 AGENT_SELECTION = 'random'
+SEED = 173
 
 
 def _get_belief(feature: str, ag: Agent, model: str = None) -> Distribution:
@@ -27,6 +29,8 @@ def _get_belief(feature: str, ag: Agent, model: str = None) -> Distribution:
 
 
 if __name__ == '__main__':
+    random.seed(SEED)
+
     # create world and add actor agent
     world = World()
     agent = world.addAgent(AGENT_NAME)
@@ -63,23 +67,33 @@ if __name__ == '__main__':
     agent.addModel(prefer_neg_model, parent=true_model)
     agent.setReward(minimizeFeature(loc, agent.name), 1., model=prefer_neg_model)
 
-    null_model = agent.zero_level(sample=True)
+    prefer_nothing = 'prefer_nothing'  # random agent
+    agent.addModel(prefer_nothing, parent=true_model)
+    agent.setReward(setToConstantMatrix(rewardKey(agent.name), 0.), 1., model=prefer_nothing)
+
+    # null_model = agent.zero_level(sample=True)  # TODO this seems to lead to a leak into the agent's true model?
 
     # set uniform belief over agent's model in observer
     model_names = [name for name in agent.models.keys() if name != true_model]
+    dist = Distribution({model: 1. / (len(agent.models) - 1) for model in model_names})
+    world.setMentalModel(observer.name, agent.name, dist)
 
-    world.setMentalModel(observer.name, agent.name,
-                         Distribution({name: 1. / (len(agent.models) - 1) for name in model_names}))
+    # agent models ignore the observer
+    agent.ignore(observer.name)
+    for model in model_names:
+        agent.setAttribute('beliefs', True, model=model)
+        agent.ignore(observer.name, model=model)
 
-    # # observer does not observe agent's true model
+    # observer does not observe agent's true model
     observer.set_observations()
 
     agent_model = modelKey(agent.name)
     print('====================================')
+    print(f'Initial loc: {world.getFeature(loc)}')
     print(f'Initial belief about agent\'s model:\n{_get_belief(agent_model, observer)}')
 
     for i in range(MAX_STEPS):
         print('====================================')
-        print(f'Current pos: {world.getFeature(loc)}')
         step = world.step()
+        print(f'Current loc: {world.getFeature(loc)}')
         print(f'Updated belief about agent\'s model:\n{_get_belief(agent_model, observer)}')
