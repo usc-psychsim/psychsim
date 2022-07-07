@@ -267,9 +267,10 @@ def test_selection():
 
 
 def verify_decision(result, model: str, cls, length=None):
-    assert len(result) == 2
+    assert len(result) == 3
     assert model in result
     assert 'policy' in result
+    assert 'probability' in result
     decision = result[model]['action']
     assert isinstance(decision, cls)
     if length is not None:
@@ -287,9 +288,11 @@ def test_step_select():
     tom.setAttribute('strict_max', False, tom.get_true_model())
     tom.setAttribute('sample', False, tom.get_true_model())
     tom.setAttribute('tiebreak', False, tom.get_true_model())
+    # Test full simulation step
     state = copy.deepcopy(world.state)
     prob = world.step(state=state)
     assert math.isclose(prob, 1)
+    # Test sampling an outcome
     state = copy.deepcopy(world.state)
     prob = world.step(state=state, select=True)
     assert len(state) == 1
@@ -298,6 +301,16 @@ def test_step_select():
         assert math.isclose(prob, 0.246675822760567)
     else:
         raise NotImplementedError(f'Have not recorded whether unlikely probability is {prob}')
+    # Test selection of most likely outcome
     state = copy.deepcopy(world.state)
     prob = world.step(state=state, select='max')
     assert math.isclose(prob, 0.246675822760567)
+    # Test sampling in decision-making
+    tom.setAttribute('sample', True, tom.get_true_model())
+    state = copy.deepcopy(world.state)
+    prob = world.step(state=state)
+    action = world.getAction(tom.name, state, True)
+    table = {'chase': 0.006648354478866005,
+             'doNothing': 0.006648354478866005,
+             'hit': 0.9867032910422682}
+    assert math.isclose(prob, table[action['verb']])
