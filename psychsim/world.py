@@ -157,9 +157,8 @@ class World(object):
         prob = 1
         actions = act2dict(actions)
         # Determine the actions taken by the agents in this world
-        state, policies, choices = self.deltaAction(state, actions, horizon,
-                                                    tiebreak, keySubset, debug,
-                                                    context)
+        policies, choices, action_prob = self.delta_action(state, actions, horizon, tiebreak, keySubset, debug, context)
+        prob *= action_prob
         # Compute the effect of the chosen actions
         effect = self.deltaState(choices, state, keySubset)
         # Update turn order
@@ -196,13 +195,15 @@ class World(object):
         # self.modelGC(False)
         return prob
 
-    def deltaAction(self,state=None,actions=None,horizon=None,tiebreak=None,keySubset=None,debug={}, context=''):
+    def delta_action(self, state=None, actions=None, horizon=None, tiebreak=None,
+                     keySubset=None, debug={}, context=''):
         if state is None:
             state = self.state
         if keySubset is None:
             keySubset = state.keys()
         choices = {}
         policies = {}
+        probability = 1
         for name in self.agents:
             turn = keys.turnKey(name)
             if turn in keySubset:
@@ -224,6 +225,7 @@ class World(object):
                             choices[name] = {m[makeFuture(action)][CONSTANT] for m in policies[name].leaves()}
                     else:
                         decision = self.agents[name].decide(state=state, horizon=horizon, others=actions, debug=debug.get(name, {}), context=context)
+                        probability *= decision.get('probability', 1)
                         if name in debug:
                             debug[name]['__decision__'] = decision
                         try:
@@ -238,9 +240,9 @@ class World(object):
         if len(policies) == 0:
             self.printState(state)
             raise RuntimeError('Nobody has a turn!')
-        for name,policy in policies.items():
+        for name, policy in policies.items():
             state *= policy
-        return state,policies,choices
+        return policies, choices, probability
 
     def deltaState(self,actions,state,uncertain=False):
         """
