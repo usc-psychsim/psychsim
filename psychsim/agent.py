@@ -202,17 +202,19 @@ class Agent(object):
                 # Use real model as fallback?
                 model = self.world.getModel(self.name)
         if isinstance(model, Distribution):
-            result = {}
+            result = {'probability': 0}
             tree = None
             myAction = keys.stateKey(self.name, keys.ACTION)
             myModel = keys.modelKey(self.name)
-            model_list = list(model.domain())
-            tree = {'if': equalRow(myModel, model_list)}
-            for index, submodel in enumerate(model_list):
+            model_list = list(model.items())
+            tree = {'if': equalRow(myModel, [entry[0] for entry in model_list])}
+            for index, entry in enumerate(model_list):
+                submodel, subprob = entry
                 result[submodel] = self.decide(state=state, horizon=horizon, others=others, model=submodel,
                                                strict_max=strict_max, sample=sample, tiebreak=tiebreak, 
                                                selection=selection, actions=actions, keySet=keySet, 
                                                debug=debug, context=context)
+                result['probability'] += subprob*result[submodel]['probability']
                 try:
                     matrix = result[submodel]['policy']
                 except KeyError:
@@ -276,9 +278,9 @@ class Agent(object):
             choice = next(iter(actions))
             assert choice in self.getLegalActions(belief)
             if sample or tiebreak:
-                return {'action': choice}
+                return {'action': choice, 'probability': 1}
             else:
-                return {'action': Distribution({choice: 1})}
+                return {'action': Distribution({choice: 1}), 'probability': 1}
         logging.debug(f'{context} {model} deciding among {", ".join([str(a) for a in sorted(actions)])}')
         if horizon is None:
             horizon = self.getAttribute('horizon', model)
@@ -338,7 +340,9 @@ class Agent(object):
             values = {key: entry['__EV__'] for key, entry in V.items()}
             result['action'] = Distribution(values, self.getAttribute('rationality', model))
         if sample and isinstance(result['action'], Distribution):
-            result['action'], prob = result['action'].sample()
+            result['action'], result['probability'] = result['action'].sample()
+        else:
+            result['probability'] = 1
         logging.debug('{} Choosing {}'.format(context, result['action']))
         return result
 
@@ -981,10 +985,10 @@ class Agent(object):
         if null:
             # A fixed action policy is desired
             model = self.addModel(f'{parent_model}_null', parent=parent_model, 
-                                  horizon=0, beliefs=True, static=True,
+                                  horizon=0, beliefs=None, static=True,
                                   policy=makeTree(null), level=0, **kwargs)
         elif self.actions:
-            default = {'beliefs': True, 'static': True, 'strict_max': True, 'sample': False,
+            default = {'beliefs': None, 'static': True, 'strict_max': True, 'sample': False,
                        'tiebreak': False}
             default.update(kwargs)
             model = self.addModel(f'{parent_model}_{NUM_TO_WORD[0]}', 
