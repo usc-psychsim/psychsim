@@ -19,7 +19,8 @@ AGENT_NAME = 'actor'
 OBSERVER_NAME = 'observer'
 HORIZON = 2
 AGENT_SELECTION = 'random'
-SEED = 173
+MODEL_RATIONALITY = 0.05
+SEED = 17
 
 
 def _get_belief(feature: str, ag: Agent, model: str = None) -> Distribution:
@@ -82,7 +83,7 @@ if __name__ == '__main__':
     agent.ignore(observer.name)
     for model in model_names:
         # make models less rational to get smoother (more cautious) inference
-        agent.setAttribute('rationality', 0.05, model=prefer_pos_model)
+        agent.setAttribute('rationality', MODEL_RATIONALITY, model=model)
         agent.setAttribute('selection', 'distribution', model=model)  # also set selection to distribution
         agent.setAttribute('beliefs', True, model=model)
         agent.ignore(observer.name, model=model)
