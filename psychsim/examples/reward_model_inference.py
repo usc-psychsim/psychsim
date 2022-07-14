@@ -81,6 +81,9 @@ if __name__ == '__main__':
     # agent models ignore the observer
     agent.ignore(observer.name)
     for model in model_names:
+        # make models less rational to get smoother (more cautious) inference
+        agent.setAttribute('rationality', 0.05, model=prefer_pos_model)
+        agent.setAttribute('selection', 'distribution', model=model)  # also set selection to distribution
         agent.setAttribute('beliefs', True, model=model)
         agent.ignore(observer.name, model=model)
 
