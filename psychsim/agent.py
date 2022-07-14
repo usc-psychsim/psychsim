@@ -397,8 +397,9 @@ class Agent(object):
         outcome = self.world.step(forced_actions, current, keySubset=subkeys, horizon=horizon-t,
                                   updateBeliefs=update_beliefs, debug=debug,
                                   context='{} V_{}^{}({})'.format(context, model, t, node['__A__']))
+        discount = self.getAttribute('discount', model)
         node['__ER__'].append(self.reward(current, model))
-        node['__EV__'] += node['__ER__'][-1]
+        node['__EV__'] += node['__ER__'][-1] * discount ** node['__t__']
         node['__t__'] += 1
         return node
 
