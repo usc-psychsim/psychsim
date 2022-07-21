@@ -75,6 +75,7 @@ class World(object):
         self.history = []
 
         self.diagram = None
+        self.color = None
         self.extras = {}
 
         if isinstance(xml,Node):
@@ -293,17 +294,6 @@ class World(object):
                     pass
                 elif len(dynamics) == 1:
                     tree = dynamics[0]
-                    # if select:
-                    #     if select == 'max':
-                    #         tree, subprob = tree.sample(True, state)  # None if isinstance(state,VectorDistributionSet) else state)
-                    #     elif select is True:
-                    #         tree, subprob = tree.sample(False, state)  # None if isinstance(state,VectorDistributionSet) else state)
-                    #     elif default_select and key not in select:
-                    #         # We are selecting a specific value, just not for this particular state feature
-                    #         tree, subprob = tree.sample(False, state)  # None if isinstance(state,VectorDistributionSet) else state)
-                    #     else:
-                    #         subprob = 1
-                    #     prob *= subprob
                     for in_key in tree.getKeysIn():
                         if isFuture(in_key) and in_key not in state:
                             state.copy_value(makePresent(in_key), in_key)
@@ -877,8 +867,8 @@ class World(object):
     """State methods"""
     """-------------"""
 
-    def defineVariable(self,key,domain=float,lo=0.,hi=1.,description=None,
-                       combinator=None,codePtr=False, avoid_beliefs=True):
+    def defineVariable(self, key, domain=float, lo=0., hi=1., description=None,
+                       combinator=None, codePtr=False, avoid_beliefs=True, default=None):
         """
         Define the type and domain of a given element of the state vector
 
@@ -915,8 +905,12 @@ class World(object):
                                'combinator': combinator}
         if domain is float:
             self.variables[key].update({'lo': lo,'hi': hi})
+            if default is None:
+                default = lo
         elif domain is int:
             self.variables[key].update({'lo': int(lo),'hi': None if hi is None else int(hi)})
+            if default is None:
+                default = lo
         elif domain is list or domain is set:
             assert isinstance(lo,list) or isinstance(lo,set),\
                 'Please provide set/list of elements for features of the set/list type'
@@ -925,8 +919,15 @@ class World(object):
                 if element not in self.symbols:
                     self.symbols[element] = len(self.symbols)
                     self.symbolList.append(element)
+            if default is None:
+                if not isModelKey(key):
+                    if len(lo) == 0:
+                        raise ValueError(f'No possible values provided for {key}')
+                    default = next(iter(lo))
         elif domain is bool:
             self.variables[key].update({'lo': 0,'hi': 1})
+            if default is None:
+                default = False
         elif domain is ActionSet:
             # The actions of an agent
             if isinstance(lo,float):
@@ -943,6 +944,8 @@ class World(object):
                 if action not in self.symbols:
                     self.symbols[action] = len(self.symbols)
                     self.symbolList.append(action)
+            if default is None:
+                default = next(iter(lo))
         else:
             raise ValueError('Unknown domain type %s for %s' % (domain,key))
         self.variables[key]['key'] = key
@@ -966,6 +969,8 @@ class World(object):
                 self.extras[key] = '%s:%d' % (mod,frame.lineno)
             except AttributeError:
                 self.extras[key] = '%s:%d' % (mod,frame[2])
+        if default is not None:
+            self.set_feature(key, default)
 
     def setFeature(self, key, value, state=None, noclobber=False, recurse=False):
         self.set_feature(key, value, state, noclobber, recurse)
@@ -1814,16 +1819,17 @@ class World(object):
     """Serialization methods"""
     """---------------------"""
         
-    def save(self,filename):
+    def save(self, filename):
         """
         :returns: the filename used (possibly with a .psy extension added)
         :rtype: str
         """
         if filename[-4:] != '.psy':
             filename = '%s.psy' % (filename)
-        with bz2.BZ2File(filename,'w') as f:
-            pickle.dump(self,f)
+        with bz2.BZ2File(filename, 'w') as f:
+            pickle.dump(self, f)
         return filename
+
 
 def scaleValue(value,entry):
     """
