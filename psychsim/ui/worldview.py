@@ -29,18 +29,19 @@ gtnodes = {}
 #        gtnodes[row['Source']].add(row['Target'])
 #print(sorted(gtnodes.keys()))
 
+
 def getLayout(graph):
     layout = {'state pre': [set()],
               'state post': [set()],
               'action': set(),
               'utility': set(),
               }
-    for target in ['state pre','state post']:
+    for target in ['state pre', 'state post']:
         remaining = []
-        for key,table in graph.items():
+        for key, table in graph.items():
             if table['type'] == target:
-                parents = set([parent for parent in table['parents'] \
-                                   if graph[parent]['type'] == target])
+                parents = set([parent for parent in table['parents'] 
+                               if graph[parent]['type'] == target])
                 if len(parents) == 0:
                     table['index'] = 0
                     layout[target][0].add(key)
@@ -49,20 +50,21 @@ def getLayout(graph):
         while len(remaining) > 0:
             layout[target].append(set())
             temp = []
-            for key,parents in remaining:
+            for key, parents in remaining:
                 parents -= layout[target][-2]
                 if parents:
-                    temp.append((key,parents))
+                    temp.append((key, parents))
                 else:
                     layout[target][-1].add(key)
             remaining = temp
-    for target in ['action','utility']:
-        for key,table in graph.items():
+    for target in ['action', 'utility']:
+        for key, table in graph.items():
             if table['type'] == target:
                 layout[target].add(key)
 
     return layout
     
+
 class WorldView(QGraphicsScene):
     rowHeight = 100
     colWidth = 150
@@ -597,9 +599,18 @@ class WorldView(QGraphicsScene):
                 color = node.defaultColor
                 if mode == 'agent':
                     if node.agent:
-                        color = self.world.diagram.getColor(node.agent.name)
+                        if node.agent.color:
+                            if isinstance(node.agent.color, str):
+                                color = QColor(node.agent.color)
+                            else:
+                                color = node.agent.color
+                        else:
+                            color = self.world.diagram.getColor(node.agent.name)
                     elif node.agent is None:
-                        color = self.world.diagram.getColor(None)
+                        if self.world.color is None:
+                            color = self.world.diagram.getColor(None)
+                        else:
+                            color = QColor(self.world.color)
                 elif mode == 'likelihood':
                     if cache is None:
                         # Pre-compute some outcomes
@@ -673,7 +684,7 @@ class WorldView(QGraphicsScene):
 
     def saveImage(self,fname):
         rect = self.minRect() #self.sceneRect()
-        pix = QImage(rect.width(), rect.height(),QImage.Format_ARGB32)
+        pix = QImage(int(rect.width()), int(rect.height()), QImage.Format_ARGB32)
         painter = QPainter(pix)
         self.render(painter,rect)
         painter.end()
