@@ -572,7 +572,7 @@ class VectorDistributionSet:
         elif isinstance(other,KeyedVector):
             self.multiply_vector(other)
         else:
-            raise NotImplementedError
+            raise TypeError(f'Unable to multiply state of type {self.__class__.__name__} by {other.__class__.__name__}')
         return self
 
     def multiply_vector(self, other):
