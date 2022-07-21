@@ -4,6 +4,7 @@ Class definition for representation of dependency structure among all variables 
 from psychsim.pwl.keys import *
 from psychsim.action import ActionSet
 
+
 class DependencyGraph(dict):
     """
     Representation of dependency structure among PsychSim variables
@@ -42,7 +43,7 @@ class DependencyGraph(dict):
             self.computeGraph()
         return dict.__getitem__(self,key)
 
-    def computeGraph(self,agents=None,state=None,belief=False):
+    def computeGraph(self, agents=None,state=None,belief=False):
         # Process the unary state features
         if agents is None:
             agents = sorted(self.world.agents.keys())
@@ -60,8 +61,8 @@ class DependencyGraph(dict):
                         self[makeFuture(key)] = {'agent': agent,'type': 'state post',
                                                  'children': set(),'parents': set()}
         # Process the binary state features
-        for relation,table in self.world.relations.items():
-            for key,entry in table.items():
+        for relation, table in self.world.relations.items():
+            for key, entry in table.items():
                 if key in state and entry['subject'] in agents and entry['object'] in agents:
                     self[key] = {'agent': entry['subject'],
                                  'type': 'state pre',
@@ -91,7 +92,7 @@ class DependencyGraph(dict):
                                         'parents': set(),
                                         'children': set()}
         # Create links from dynamics
-        for key,dynamics in self.world.dynamics.items():
+        for key, dynamics in self.world.dynamics.items():
             if not isinstance(key,str):
                 continue
             if isTurnKey(key):
