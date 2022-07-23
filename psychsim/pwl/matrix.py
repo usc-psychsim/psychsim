@@ -393,3 +393,23 @@ def setTrueMatrix(key):
 
 def setFalseMatrix(key):
     return setToConstantMatrix(key, 0)
+
+
+def setToSumMatrix(key, key1, key2, weight1=1, weight2=1, shift=0):
+    """
+    :type otherKey: str
+    :returns: a dynamics matrix setting the given keyed value to a (possibly weighted and translated) difference between the two given keys
+    :rtype: L{KeyedMatrix}
+    """
+    return KeyedMatrix({makeFuture(key): KeyedVector({key1: weight1, key2: weight2, CONSTANT: shift})})
+
+
+def setToDifferenceMatrix(key, key1, key2, weight1=1, weight2=1, shift=0):
+    """
+    :type otherKey: str
+    :returns: a dynamics matrix setting the given keyed value to a (possibly weighted and translated) difference between the two given keys
+    :rtype: L{KeyedMatrix}
+    """
+    assert weight1 > 0, 'Only positive weights allowed for setToDifferenceMatrix. Use setToSumMatrix instead.'
+    assert weight2 > 0, 'Only positive weights allowed for setToDifferenceMatrix. Use setToSumMatrix instead.'
+    return setToSumMatrix(key, key1, key2, weight1, -weight2, shift)
