@@ -263,12 +263,14 @@ class Agent(object):
                 valid_prob = sum([action[a] for a in action.domain() if a in actions])
                 elements = [(a, action[a]/valid_prob) for a in action.domain() if a in actions]
                 result = {'policy': makeTree({'distribution': [(setToConstantMatrix(actionKey(self.name), a), prob) for a, prob in elements]}),
-                          'action': Distribution({a: prob for a, prob in elements})}
+                          'action': Distribution({a: prob for a, prob in elements}),
+                          'probability': 1}
             else:
                 if action not in actions:
                     raise ValueError(f'Policy for model {model} specifies out-of-bounds action choice {action}')
                 result = {'policy': makeTree(setToConstantMatrix(actionKey(self.name), action)),
-                          'action': Distribution({action: 1})}
+                          'action': Distribution({action: 1}),
+                          'probability': 1}
             return result
         if len(actions) == 0:
             # Someone made a boo-boo because there is no legal action for this agent right now
