@@ -350,7 +350,7 @@ class Agent(object):
 
     def value(self, belief, action, model, horizon=None, others=None, keySet=None, updateBeliefs=True, debug={}, context=''):
         if horizon is None:
-            horizon = self.getAttribute('horizon',model)
+            horizon = self.getAttribute('horizon', model)
         if keySet is None:
             keySet = belief.keys()
         # Compute value across possible worlds
@@ -923,7 +923,7 @@ class Agent(object):
     def ignore(self, agents, model=None):
         if model is None:
             model = self.get_true_model()
-        beliefs = self.models[model]['beliefs']
+        beliefs = self.models[model].get('beliefs', True)
         if beliefs is True:
             beliefs = self.create_belief_state(model=model)
         if isinstance(agents, str):
@@ -966,7 +966,7 @@ class Agent(object):
         self.modelList[model['index']] = name
         self.world.symbols[name] = model['index']
         self.world.symbolList.append(name)
-        if not name in self.world.variables[modelKey(self.name)]['elements']:
+        if name not in self.world.variables[modelKey(self.name)]['elements']:
             self.world.variables[modelKey(self.name)]['elements'].append(name)
         return model
 
@@ -991,7 +991,7 @@ class Agent(object):
                                   horizon=0, beliefs=None, static=True,
                                   policy=makeTree(null), level=0, **kwargs)
         elif self.actions:
-            default = {'beliefs': None, 'static': True, 'strict_max': True, 'sample': False,
+            default = {'beliefs': True, 'static': True, 'strict_max': True, 'sample': False,
                        'tiebreak': False}
             default.update(kwargs)
             model = self.addModel(f'{parent_model}_{NUM_TO_WORD[0]}', 
@@ -1004,40 +1004,45 @@ class Agent(object):
                                   static=True, level=0, **kwargs)
         return model['name']
 
-    def n_level(self, n, parent_models=None, null={}, prefix='', **kwargs):
+    def n_level(self, n, parent=None, parent_models=None, models=None, null={}, 
+                prefix='', **kwargs):
         """
         :warning: Does not check whether there are existing models
         """
-        if parent_models is None:
+        if parent_models is not None:
+            raise DeprecationWarning('Use a single parent argument, or omit altogether')
             parent_models = {self.name: {self.get_true_model()}}
+        if parent is None:
+            parent = self.get_true_model(unique=True)
         if n == 0:
             raise ValueError('For n=0, use zero_level method instead')
         try:
             suffix = NUM_TO_WORD[n]
         except IndexError:
             suffix = f'level{n}'
-        beliefs = {model: self.getBelief(model=model) for model in parent_models[self.name]}
-        for belief in beliefs.values():
-            for name, models in self.world.get_current_models(belief, recurse=False).items():
-                if name != self.name:
-                    parent_models[name] = parent_models.get(name, set()) | models
-        result = {}
-        for parent in parent_models[self.name]:
-            model = self.addModel(f'{prefix}{parent}_{suffix}', parent=parent, level=n, **kwargs)
-            result[parent] = model['name']
-            beliefs = self.create_belief_state(model=model['name'])
-            for key in beliefs.keys():
-                if isModelKey(key):
-                    name = state2agent(key)
-                    if name != self.name:
-                        if n == 1:
-                            new_models = {model: self.world.agents[name].zero_level(parent_model=model, null=null.get(name, None)) for model in parent_models[name]}
-                        else:
-                            new_models = self.world.agents[name].n_level(n-1, parent_models={name: parent_models[name]}, null=null, 
-                                prefix=f'{prefix}{model["name"]}_', **kwargs)
-                        beliefs.replace({self.world.value2float(key, old_model): self.world.value2float(key, new_model) for old_model, new_model in new_models.items()}, key)
-            result[parent] = model
-        return result
+        beliefs = self.getBelief(model=parent)
+        model = self.addModel(f'{prefix}{parent}_{suffix}', parent=parent, level=n, **kwargs)
+        parent_beliefs = self.getBelief(model=parent)
+        if models is None:
+            # Fill in mental models based on parent beliefs
+            models = {state2agent(key): None for key in parent_beliefs.keys() 
+                      if isModelKey(key) and state2agent(key) != self.name}
+            ignore = None
+        else:
+            # Mental models provided as argument, ignore all others
+            ignore = {key for key in parent_beliefs.keys()
+                      if isModelKey(key) and state2agent(key) != self.name and state2agent(key) not in models}
+        beliefs = self.create_belief_state(model=model['name'], ignore=ignore)
+        for name, mental_model in models.items():
+            key = modelKey(name)
+            if mental_model is None:
+                if n == 1:
+                    mental_model = self.world.agents[name].zero_level(null=null.get(name, None)) 
+                else:
+                    mental_model = self.world.agents[name].n_level(n-1, null=null, prefix=f'{prefix}{model["name"]}_')
+            del beliefs[key]
+            self.world.setFeature(key, mental_model, beliefs)
+        return model['name']
 
     def get_nth_level(self, n, state=None, **kwargs):
         """
