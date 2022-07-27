@@ -167,7 +167,13 @@ class VectorDistributionSet:
                     prob = dist[vector]
                     del dist[vector]
                     del vector[key]
-                    dist.addProb(vector,prob)
+                    dist.addProb(vector, prob)
+                if len(dist) == 1:
+                    # No more uncertainty
+                    for other_key, value in dist.first().items():
+                        self.keyMap[other_key] = None
+                        self.certain[other_key] = value
+                    del self.distributions[substate]
 
     def deleteKeys(self,toDelete):
         """
