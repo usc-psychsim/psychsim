@@ -284,7 +284,7 @@ def test_zero_level():
     R = jerry.getReward(jerry.get_true_model())   
     R0 = jerry.getReward(jerry0)
     assert R == R0 
-    decision = jerry.decide(model=jerry0, others={tom.name: actions['hit']}, debug={'preserve_states': True})
+    decision = jerry.decide(model=jerry0, others={tom.name: actions['hit']})
     assert decision['action'] == actions['trick']
     tom1 = tom.n_level(n=1, models={jerry.name: jerry0})
     decision = tom.decide(model=tom1, others={jerry.name: actions['trick']})
