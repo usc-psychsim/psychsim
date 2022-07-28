@@ -281,16 +281,18 @@ def test_zero_level():
     jerry = world.agents['Jerry']
     tom = world.agents['Tom']
     jerry0 = jerry.zero_level(horizon=1)
+    tom1 = tom.n_level(n=1, models={jerry.name: jerry0}, horizon=1)
     R = jerry.getReward(jerry.get_true_model())   
     R0 = jerry.getReward(jerry0)
     assert R == R0 
     decision = jerry.decide(model=jerry0, others={tom.name: actions['hit']})
     assert decision['action'] == actions['trick']
-    tom1 = tom.n_level(n=1, models={jerry.name: jerry0})
     decision = tom.decide(model=tom1, others={jerry.name: actions['trick']})
     assert decision['action'] == actions['chase']
     decision = tom.decide(model=tom1, others={jerry.name: actions['run']})
     assert decision['action'] == actions['hit']
+    decision = tom.decide(model=tom1)
+    assert decision['action'] == actions['chase']
 
 
 def test_selection():
