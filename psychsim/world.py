@@ -1,6 +1,7 @@
 from __future__ import print_function
 import bz2
 import copy
+import json
 import os
 import pickle
 from io import StringIO
@@ -1268,21 +1269,34 @@ class World(object):
                     tree[name] = {model: {} for model in models}
                 cycles = models & all_models
                 if cycle_check and cycles:
-                    raise ValueError('Cycle in beliefs for models: {}'.format(', '.join(sorted(cycles))))
+                    if tree:
+                        msg = json.dumps(tree, indent=3)
+                    else:
+                        msg = ', '.join(sorted(cycles))
+                    raise ValueError(f'Cycle in beliefs for models: {msg}')
                 all_models |= models
                 result[name] = result.get(name, set()) | models
                 if recurse:
                     for model in models - cycles:
-                        if self.agents[name].models[model].get('beliefs', True) is not True:
+                        beliefs = self.agents[name].models[model].get('beliefs', None)
+                        if beliefs is True:
+                            beliefs = self.state
+                        elif beliefs is not None:
                             beliefs = self.agents[name].getBelief(model=model)
-                            new_models = self.get_current_models(beliefs, cycle_check, all_models, tree if tree is None else tree[name][model])
-                            for sub_name, sub_models in new_models.items():
-                                if cycle_check:
-                                    cycles = sub_models & all_models
-                                    if cycles:
-                                        raise ValueError('Cycle in beliefs for models: {}'.format(', '.join(sorted(cycles))))
-                                all_models |= sub_models
-                                result[sub_name] = result.get(sub_name, set()) | sub_models
+                        else:
+                            continue
+                        new_models = self.get_current_models(beliefs, cycle_check, all_models, tree if tree is None else tree[name][model])
+                        for sub_name, sub_models in new_models.items():
+                            if cycle_check:
+                                cycles = sub_models & all_models
+                                if cycles:
+                                    if tree:
+                                        msg = json.dumps(tree, indent=3)
+                                    else:
+                                        msg = ', '.join(sorted(cycles))
+                                    raise ValueError(f'Cycle in beliefs for models: {msg}')
+                            all_models |= sub_models
+                            result[sub_name] = result.get(sub_name, set()) | sub_models
         return result
 
 
