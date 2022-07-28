@@ -4,9 +4,9 @@ import math
 from psychsim.probability import Distribution
 from psychsim.action import ActionSet
 from psychsim.world import World
-from psychsim.pwl.keys import stateKey
-from psychsim.pwl.matrix import approachMatrix, incrementMatrix, noChangeMatrix
-from psychsim.pwl.plane import equalRow, thresholdRow
+from psychsim.pwl.keys import makeFuture, stateKey
+from psychsim.pwl.matrix import approachMatrix, incrementMatrix, noChangeMatrix, setTrueMatrix
+from psychsim.pwl.plane import equalRow, thresholdRow, trueRow
 from psychsim.pwl.tree import makeTree
 from psychsim.reward import minimizeFeature, maximizeFeature
 
@@ -48,9 +48,31 @@ def add_dynamics(world, actions):
     tree = makeTree({'distribution': [(approachMatrix(stateKey('Jerry', 'health'), .1, 0), 0.5),
                                       (noChangeMatrix(stateKey('Jerry', 'health')), 0.5)]})
     world.setDynamics(stateKey('Jerry', 'health'), actions['hit'], tree)
-    tree = makeTree({'distribution': [(approachMatrix(stateKey('Tom', 'health'), .1, 0), 0.5),
+    tree = makeTree({'distribution': [(approachMatrix(stateKey('Tom', 'health'), .1, 1), 0.5),
                                       (noChangeMatrix(stateKey('Tom', 'health')),  0.5)]})
     world.setDynamics(stateKey('Tom', 'health'), actions['hit'], tree)
+
+
+def add_trick_dynamics(world, actions):
+    trick = world.define_state('Tom', 'tricked', bool, default=False)
+    world.setDynamics(trick, actions['trick'], makeTree(setTrueMatrix(trick)))
+    tree = makeTree({'if': trueRow(makeFuture(trick)),
+                     # If tricked, bad
+                     True: Distribution({approachMatrix(stateKey('Tom', 'health'), .1, 0): 0.5,
+                                         noChangeMatrix(stateKey('Tom', 'health')): 0.5}),
+                     # If not tricked, good
+                     False: Distribution({approachMatrix(stateKey('Tom', 'health'), .1, 1): 0.5,
+                                          noChangeMatrix(stateKey('Tom', 'health')): 0.5})})
+    world.setDynamics(stateKey('Tom', 'health'), actions['hit'], tree)
+    world.agents['Tom'].setReward(maximizeFeature(stateKey('Tom', 'health'), 'Tom'), 1)
+    tree = makeTree({'if': trueRow(makeFuture(trick)),
+                     # If tricked, good for Jerry
+                     True: Distribution({approachMatrix(stateKey('Jerry', 'health'), .1, 1): 0.5,
+                                         noChangeMatrix(stateKey('Jerry', 'health')): 0.5}),
+                     # If not tricked, bad for Jerry
+                     False: Distribution({approachMatrix(stateKey('Jerry', 'health'), .1, 0): 0.5,
+                                          noChangeMatrix(stateKey('Jerry', 'health')): 0.5})})
+    world.setDynamics(stateKey('Jerry', 'health'), actions['hit'], tree)
 
 
 def add_reward(world):
@@ -236,17 +258,39 @@ def test_belief_update():
 #        print(world.getModel('Tom', belief))
 
 
+def test_trick():
+    world = setup_world()
+    add_state(world)
+    actions = add_actions(world, order=['Jerry', 'Tom'])
+    add_dynamics(world, actions)
+    add_trick_dynamics(world, actions)
+    add_reward(world)
+    world.step({'Jerry': actions['trick']})
+    tom = world.agents['Tom']
+    assert tom.decide(model=tom.get_true_model())['action'] == actions['chase']
+    world.setState('Tom', 'tricked', False)
+    assert tom.decide(model=tom.get_true_model())['action'] == actions['hit']
+
+
 def test_zero_level():
     world = setup_world()
     add_state(world)
-    actions = add_actions(world)
-    add_dynamics(world,actions)
+    actions = add_actions(world, [{'Tom', 'Jerry'}])
+    add_trick_dynamics(world, actions)
     add_reward(world)
     jerry = world.agents['Jerry']
-    jerry0 = jerry.zero_level()
+    tom = world.agents['Tom']
+    jerry0 = jerry.zero_level(horizon=1)
     R = jerry.getReward(jerry.get_true_model())   
     R0 = jerry.getReward(jerry0)
     assert R == R0 
+    decision = jerry.decide(model=jerry0, others={tom.name: actions['hit']}, debug={'preserve_states': True})
+    assert decision['action'] == actions['trick']
+    tom1 = tom.n_level(n=1, models={jerry.name: jerry0})
+    decision = tom.decide(model=tom1, others={jerry.name: actions['trick']})
+    assert decision['action'] == actions['chase']
+    decision = tom.decide(model=tom1, others={jerry.name: actions['run']})
+    assert decision['action'] == actions['hit']
 
 
 def test_selection():
