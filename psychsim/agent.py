@@ -348,15 +348,18 @@ class Agent(object):
         logging.debug('{} Choosing {}'.format(context, result['action']))
         return result
 
-    def value(self, belief, action, model, horizon=None, others=None, keySet=None, updateBeliefs=True, debug={}, context=''):
+    def value(self, belief, action, model=None, horizon=None, others=None, 
+              keySet=None, updateBeliefs=True, debug={}, context=''):
+        if model is None:
+            model = self.get_true_model(unique=True)
         if horizon is None:
             horizon = self.getAttribute('horizon', model)
         if keySet is None:
             keySet = belief.keys()
         # Compute value across possible worlds
-        logging.debug('{} V_{}^{}({})=?'.format(context, model, horizon, action))
+        logging.debug(f'{context} V_{model}^{horizon}({action})=?')
         current = copy.deepcopy(belief)
-        V_A = self.getAttribute('V',model)
+        V_A = self.getAttribute('V', model)
         if V_A:
             current *= V_A[action]
             R = current[makeFuture(rewardKey(self.name))]
@@ -365,8 +368,9 @@ class Agent(object):
                  '__ER__': [R],
                  '__EV__': R.expectation()}
         else:
-            V = {'__EV__': 0.,'__ER__': [],'__S__': [current], '__t__': 0, '__A__': action}
-            if isinstance(keySet,dict):
+            V = {'__EV__': 0, '__ER__': [], '__S__': [current], '__t__': 0, 
+                 '__A__': action}
+            if isinstance(keySet, dict):
                 subkeys = keySet[action]
             else:
                 subkeys = belief.keys()
@@ -377,16 +381,20 @@ class Agent(object):
             if action:
                 start[self.name] = action
             while V['__t__'] < horizon:
-                V = self.expand_value(V, start, model, subkeys, horizon, updateBeliefs, debug, context)
+                V = self.expand_value(V, start, model, subkeys, horizon, 
+                                      updateBeliefs, debug, context)
             V['__beliefs__'] = V['__S__'][-1]
         return V
         
-    def expand_value(self, node, actions, model=None, subkeys=None, horizon=None, update_beliefs=True, debug={}, context=''):
+    def expand_value(self, node, actions, model=None, subkeys=None, 
+                     horizon=None, update_beliefs=True, debug={}, context=''):
         """
         Expands a given value node by a single step, updating the sequence of states and expected rewards accordingly
         """
         if debug.get('preserve_states', False):
             node['__S__'].append(copy.deepcopy(node['__S__'][-1]))
+        if horizon is None:
+            horizon = self.getAttribute('horizon', model=model)
         current = node['__S__'][-1]
         t = node['__t__']
         logging.debug('Time %d/%d' % (t+1, horizon))
@@ -396,9 +404,10 @@ class Agent(object):
             if name in actions:
                 forced_actions[name] = actions[name]
                 del actions[name]
-        outcome = self.world.step(forced_actions, current, keySubset=subkeys, horizon=horizon-t,
-                                  updateBeliefs=update_beliefs, debug=debug,
-                                  context='{} V_{}^{}({})'.format(context, model, t, node['__A__']))
+        probability = self.world.step(forced_actions, current, keySubset=subkeys, 
+                                      horizon=horizon-t, updateBeliefs=update_beliefs, 
+                                      debug=debug,
+                                      context=f'{context} V_{model}^{t}({node["__A__"]})')
         discount = self.getAttribute('discount', model)
         node['__ER__'].append(self.reward(current, model))
         node['__EV__'] += node['__ER__'][-1] * discount ** node['__t__']
@@ -1002,6 +1011,8 @@ class Agent(object):
             model = self.addModel(f'{parent_model}{NUM_TO_WORD[0]}', 
                                   parent=parent_model, horizon=0, beliefs=True, 
                                   static=True, level=0, **kwargs)
+        self.create_belief_state(ignore={k for k in self.getBelief(model=parent_model).keys() 
+                                         if isModelKey(k) and state2agent(k) != self.name})
         return model['name']
 
     def n_level(self, n, parent=None, parent_models=None, models=None, null={}, 
