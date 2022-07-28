@@ -1156,10 +1156,10 @@ class World(object):
     def decodeVariable(self,key,distribution):
         raise DeprecationWarning('Use float2value method instead')
 
-    def defineState(self,entity,feature,domain=float,lo=0.,hi=1.,description=None,combinator=None, codePtr=False):
-        return self.define_state(entity, feature, domain, lo, hi, description, combinator, codePtr)
+    def defineState(self, entity, feature, domain=float, lo=0., hi=1, **kwargs):
+        return self.define_state(entity, feature, domain, lo, hi, **kwargs)
 
-    def define_state(self, entity, feature, domain=float, lo=0, hi=1, description=None, combinator=None, codePtr=False):
+    def define_state(self, entity, feature, domain=float, lo=0, hi=1, **kwargs):
         """
         Defines a state feature associated with a single agent, or with the global world state.
         :param entity: if C{None}, the given feature is on the global world state; otherwise, it is local to the named agent
@@ -1172,9 +1172,9 @@ class World(object):
             self.locals[entity][feature] = key
         except KeyError:
             self.locals[entity] = {feature: key}
-        if not domain is None:
+        if domain is not None:
             # Haven't defined this feature yet
-            self.defineVariable(key,domain,lo,hi,description,combinator, codePtr)
+            self.defineVariable(key, domain, lo, hi, **kwargs)
         return key
 
     def setState(self, entity, feature, value, state=None, noclobber=False, recurse=False):
