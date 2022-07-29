@@ -1000,7 +1000,7 @@ class Agent(object):
                                   horizon=0, beliefs=None, static=True,
                                   policy=makeTree(null), level=0, **kwargs)
         elif self.actions:
-            default = {'beliefs': True, 'static': True, 'strict_max': True, 'sample': False,
+            default = {'beliefs': True, 'strict_max': True, 'sample': False,
                        'tiebreak': False}
             default.update(kwargs)
             model = self.addModel(f'{parent_model}_{NUM_TO_WORD[0]}', 
@@ -1011,8 +1011,9 @@ class Agent(object):
             model = self.addModel(f'{parent_model}{NUM_TO_WORD[0]}', 
                                   parent=parent_model, horizon=0, beliefs=True, 
                                   static=True, level=0, **kwargs)
-        self.create_belief_state(ignore={k for k in self.getBelief(model=parent_model).keys() 
-                                         if isModelKey(k) and state2agent(k) != self.name})
+        beliefs = self.create_belief_state(ignore={k for k in self.getBelief(model=parent_model).keys() 
+                                           if isModelKey(k) and state2agent(k) != self.name}, model=model['name'])
+        self.world.setFeature(modelKey(self.name), model['name'], beliefs)
         return model['name']
 
     def n_level(self, n, parent=None, parent_models=None, models=None, null={}, 
@@ -1363,8 +1364,7 @@ class Agent(object):
                     newModel = self.models[newModel]['index']
             except KeyError:
                 pass
-            if self.getAttribute('static',oldModel) is True or 'beliefs' not in self.models[oldModel] or \
-                self.models[oldModel]['beliefs'] is True:
+            if self.getAttribute('static',oldModel) is True or 'beliefs' not in self.models[oldModel] or self.models[oldModel]['beliefs'] is True:
                 # My beliefs (and my current mental model) never change
                 newModel = oldModel
             elif myAction in self.models[oldModel]['SE'] and label in self.models[oldModel]['SE'][myAction]:
@@ -1380,12 +1380,13 @@ class Agent(object):
                 beliefs = copy.deepcopy(original)
                 # Project direct effect of the actions, including possible observations
                 assert oldModel[-4:] != 'zero'
-                outcome = self.world.step({self.name: myAction} if myAction else None,beliefs,
-                    keySubset=beliefs.keys(),horizon=horizon,updateBeliefs=False)
+                outcome = self.world.step({self.name: myAction} if myAction else None, 
+                                          beliefs, keySubset=beliefs.keys(),
+                                          horizon=horizon, updateBeliefs=False)
                 # Condition on actual observations
                 for omega in self.omega:
                     value = vector[omega]
-                    if not omega in beliefs:
+                    if omega not in beliefs:
                         continue
                     for b in beliefs.distributions[beliefs.keyMap[omega]].domain():
                         if b[omega] == value:
@@ -1394,8 +1395,7 @@ class Agent(object):
                         if omega == oldModelKey:
                             continue
                         else:
-                            logging.warning('%s (model %s) has impossible observation %s=%s when doing %s' % \
-                                          (self.name,oldModel,omega,self.world.float2value(omega,vector[omega]),myAction))
+                            logging.warning(f'{self.name} (model {oldModel}) has impossible observation {omega}={self.world.float2value(omega,vector[omega])} when doing {myAction}')
                             SE[oldModel][label] = None
                             break
                     beliefs[omega] = vector[omega]
@@ -1422,9 +1422,8 @@ class Agent(object):
                 if isinstance(SE[oldModel][label],int) or isinstance(SE[oldModel][label],float):
                     vector[newModelKey] = SE[oldModel][label]
                 else:
-                    raise RuntimeError('Unable to process stochastic belief updates:%s' \
-                        % (SE[oldModel][olabel]))
-                newDist.addProb(vector,prob)
+                    raise RuntimeError(f'Unable to process stochastic belief updates: {SE[oldModel][olabel]}') 
+                newDist.addProb(vector, prob)
         newDist.normalize()
 #        assert len(newDist) > 0
 #        for vector in newDist.domain():
