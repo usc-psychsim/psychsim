@@ -224,7 +224,7 @@ class World(object):
                             policies[name] = makeTree(setToConstantMatrix(action,actions[name])).desymbolize(self.symbols)
                         else:
                             policies[name] = actions[name]
-                            choices[name] = {m[makeFuture(action)][CONSTANT] for m in policies[name].leaves()}
+                            choices[name] = {self.float2value(action, m[makeFuture(action)][CONSTANT]) for m in policies[name].leaves()}
                     else:
                         decision = self.agents[name].decide(state=state, horizon=horizon, others=actions, debug=debug.get(name, {}), context=context)
                         probability *= decision.get('probability', 1)
