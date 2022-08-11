@@ -48,6 +48,9 @@ class Distribution:
         except ValueError:
             return 0
 
+    def __contains__(self, element):
+        return element in self.domain()
+
     def __getitem__(self, element):
         for other, prob in self.__items:
             if other == element:
