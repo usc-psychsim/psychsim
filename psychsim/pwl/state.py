@@ -118,6 +118,8 @@ class VectorDistributionSet:
         if substate is None:
             if self.certain[key] != value:
                 raise ValueError(f'P({key}={value}) = 0 because {key}={self.certain[key]}')
+            else:
+                return 1
         else:
             prob = 0
             dist = self.distributions[substate]
@@ -217,7 +219,7 @@ class VectorDistributionSet:
         result = {}
         for vector in original.domain():
             value = vector[key]
-            if not value in result:
+            if value not in result:
                 # Copy everything from me except the distribution of the given key
                 result[value] = self.__class__()
                 result.keyMap.update(self.keyMap)
@@ -248,9 +250,9 @@ class VectorDistributionSet:
         :return: C{True} iff this distribution has any uncertainty about the vector
         :rtype: bool
         """
-        return sum(map(len,self.distributions.values())) > len(self.distributions)
+        return sum(map(len, self.distributions.values())) > len(self.distributions)
 
-    def findUncertainty(self,substates=None):
+    def findUncertainty(self, substates=None):
         """
         :param substates: Consider only the given substates as candidates
         :return: a substate containing an uncertain distribution if one exists; otherwise, None
@@ -281,8 +283,8 @@ class VectorDistributionSet:
         :rtype: KeyedVector
         """
         vector = KeyedVector()
-        for substate,distribution in self.distributions.items():
-            assert len(distribution) == 1,'Cannot return vector from uncertain distribution'
+        for substate, distribution in self.distributions.items():
+            assert len(distribution) == 1, 'Cannot return vector from uncertain distribution'
             vector.update(distribution.domain()[0])
         return vector
 
@@ -303,7 +305,7 @@ class VectorDistributionSet:
                 vector.update(subvector)
                 prob *= self.distributions[substate][subvector]
                 index = index // len(self.distributions[substate])
-            yield KeyedVector(vector),prob
+            yield KeyedVector(vector), prob
 
     def select(self, maximize=False, incremental=False):
         """
@@ -332,7 +334,7 @@ class VectorDistributionSet:
         """
         :return: the substate referred to by all of the keys in the given object
         """
-        if isinstance(obj,bool):
+        if isinstance(obj, bool):
             raise DeprecationWarning('If you really need this, please inform management.')
             return set()
         elif ignoreCertain:
