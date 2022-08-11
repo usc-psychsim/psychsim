@@ -322,22 +322,29 @@ class World(object):
                             cumulative *= tree
                     tree = cumulative
                     if select:
-                        if isinstance(state,VectorDistributionSet):
-                            state.__imul__(tree,select)
+                        if isinstance(state, VectorDistributionSet):
+                            state.__imul__(tree, select)
                         else:
-                            if isinstance(tree,KeyedMatrix):
+                            if isinstance(tree, KeyedMatrix):
                                 state *= tree
                             else:
-                                raise TypeError('Unable to generate selective effect from:\n%s' % (tree))
+                                raise TypeError(f'Unable to generate selective effect from:\n{tree}')
                     else:
                         state *= tree
                 if isinstance(select, dict) and key in select:
-                    if select[key] not in state.marginal(makeFuture(key)):
+                    try:
+                        target = makeFuture(key)
+                        values = state.marginal(target)
+                    except KeyError:
+                        # No change
+                        target = key
+                        values = state.marginal(target)
+                    if select[key] not in values:
                         value = self.float2value(key, select[key])
                         nonzero = ', '.join(['"%s"' % (self.float2value(key, el)) 
-                                             for el in state.marginal(makeFuture(key)).domain()])
+                                             for el in values.domain()])
                         raise ValueError(f'Selecting impossible value "{value}" for {key} (nonzero probability for {nonzero})')
-                    prob *= state.setitem(makeFuture(key), select[key])
+                    prob *= state.setitem(target, select[key])
                 if max_k is not None:
                     prob *= state.prune_size(max_k)
         return prob
