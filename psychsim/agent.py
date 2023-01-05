@@ -19,6 +19,12 @@ from psychsim.probability import Distribution
 NUM_TO_WORD = ['zero', 'one', 'two', 'three', 'four', 'five']
 
 
+class _ActionList(list):
+    def add(self, item):
+        if item not in self:
+            self.append(item)
+
+
 class Agent(object):
     """
     :ivar name: agent name
@@ -42,7 +48,7 @@ class Agent(object):
 
     def __init__(self,name,world=None):
         self.world = world
-        self.actions = set()
+        self.actions = _ActionList()  # TODO hack to ensure same action order
         self.legal = {}
         self.omega = True
 #        self.O = True
@@ -743,7 +749,7 @@ class Agent(object):
             # No restrictions on legal actions, so take a shortcut
             return actions
         # Otherwise, filter out illegal actions
-        result = set()
+        result = _ActionList()  # TODO hack to ensure same action order
         for action in actions:
             try:
                 tree = self.legal[action]
