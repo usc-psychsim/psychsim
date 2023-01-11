@@ -375,6 +375,8 @@ class VectorDistributionSet:
             else:
                 self.distributions[substate].delete_column(key)
         if substate is None:
+            if isinstance(value, Distribution) and len(value) == 1 and value[value.first()] == 1:
+                value = value.first()
             if isinstance(value, Distribution):
                 substate = 0
                 while substate in self.distributions:
