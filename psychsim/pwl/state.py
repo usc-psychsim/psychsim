@@ -1055,7 +1055,7 @@ class VectorDistributionSet:
             self.certain[new_key] = self.certain[old_key]
         else:
             dist = self.distributions[substate]
-            for vector in dist.domain():
+            for vector in list(dist.domain()):
                 prob = dist[vector]
                 del dist[vector]
                 vector[new_key] = vector[old_key]
