@@ -13,7 +13,7 @@ In order to install the module for development (see pip [docs][1]):
 
 Using the `-e` argument will allow you to actively work on the package locally without needing to re-install every time you make a modification to the source. In order to install "permanently" simply omit the `-e` in step 2 above.
 
-To install from a `requrements.txt` (i.e. as part of an automated docker build) [use][2]:
+To install from a `requirements.txt` (i.e. as part of an automated docker build) [use][2]:
 ```
 -e git+https://github.com/usc-psychsim/psychsim.git#egg=psychsim
 ```
